@@ -210,6 +210,8 @@ export default function Home() {
               <div key={i} className="h-[320px] animate-pulse rounded-[22px] bg-surface-2" />
             ))}
           </div>
+        ) : osmStatus === "off" ? (
+          <p className="rounded-2xl bg-osm-bg p-5 text-osm-ink">This is a preview with demo listings. In the full app, this row fills with real cafés, parks, pools and venues from OpenStreetMap.</p>
         ) : osmStatus === "error" ? (
           <p className="rounded-2xl bg-surface-2 p-5 text-ink-soft">OpenStreetMap didn&apos;t respond just now. Demo listings are still shown everywhere else.</p>
         ) : (

@@ -4,9 +4,23 @@ import { Loader2, LocateFixed, MapPin } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useApp } from "@/components/providers/app-provider";
 import { Sheet } from "@/components/ui/sheet";
+import { PREVIEW } from "@/lib/preview";
 import { useToast } from "@/components/ui/toast";
 
 type Result = { label: string; detail: string; lat: number; lng: number };
+
+/** Quick picks, shown before typing and whenever live search is unavailable. */
+const POPULAR: Result[] = [
+  { label: "London", detail: "England", lat: 51.5145, lng: -0.0875 },
+  { label: "Manchester", detail: "England", lat: 53.4808, lng: -2.2426 },
+  { label: "Bristol", detail: "England", lat: 51.4545, lng: -2.5879 },
+  { label: "Leeds", detail: "England", lat: 53.7997, lng: -1.5492 },
+  { label: "Brighton", detail: "England", lat: 50.8225, lng: -0.1372 },
+  { label: "Glasgow", detail: "Scotland", lat: 55.8617, lng: -4.2583 },
+  { label: "Edinburgh", detail: "Scotland", lat: 55.9533, lng: -3.1883 },
+  { label: "Cardiff", detail: "Wales", lat: 51.4816, lng: -3.1791 },
+  { label: "Brussels", detail: "Belgium", lat: 50.8467, lng: 4.3525 },
+];
 
 export function useGeocode(q: string) {
   const [results, setResults] = useState<Result[]>([]);
@@ -16,6 +30,12 @@ export function useGeocode(q: string) {
     if (q.trim().length < 2) {
       setResults([]);
       setError(null);
+      return;
+    }
+    if (PREVIEW) {
+      const s = q.trim().toLowerCase();
+      setResults(POPULAR.filter((p) => p.label.toLowerCase().includes(s)));
+      setError("This preview can only search the cities below. Any place or postcode works in the full app.");
       return;
     }
     const ctrl = new AbortController();
@@ -98,6 +118,19 @@ export function LocationDialog() {
         Use my current location
       </button>
       {error && <p className="mt-3 text-sm text-warn">{error}</p>}
+      {(q.trim().length < 2 || error) && (
+        <div className="mt-4">
+          <p className="mb-2 text-sm font-bold text-ink-soft">Popular</p>
+          <div className="flex flex-wrap gap-2">
+            {POPULAR.map((p) => (
+              <button key={p.label} type="button" onClick={() => { setPlace({ label: p.label, lat: p.lat, lng: p.lng }); close(); }}
+                className="rounded-full border border-line bg-surface px-3.5 py-2 text-sm font-bold hover:border-primary">
+                {p.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       <ul className="mt-3 divide-y divide-line">
         {results.map((r) => (
           <li key={`${r.lat},${r.lng}`}>
@@ -119,7 +152,7 @@ export function LocationDialog() {
         ))}
       </ul>
       <p className="mt-4 text-xs text-ink-soft">
-        Now showing: <strong>{place.label}</strong>. Location search by OpenStreetMap Nominatim.
+        Now showing: <strong>{place.label}</strong>.{!PREVIEW && " Location search by OpenStreetMap Nominatim."}
       </p>
     </Sheet>
   );

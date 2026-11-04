@@ -37,7 +37,7 @@ function loadMapLibre() {
   maplibrePromise ??= import("maplibre-gl")
     .then((lib) => {
       if (!lib.getWorkerUrl()) {
-        lib.setWorkerUrl("/maplibre-gl-worker.mjs");
+        lib.setWorkerUrl((globalThis as { __MAPLIBRE_WORKER_URL?: string }).__MAPLIBRE_WORKER_URL ?? "/maplibre-gl-worker.mjs");
       }
       return lib;
     })

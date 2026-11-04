@@ -15,6 +15,7 @@ import { Sheet } from "@/components/ui/sheet";
 import { useToast } from "@/components/ui/toast";
 import { bookingLink } from "@/lib/affiliate";
 import { logEvent } from "@/lib/analytics";
+import { PREVIEW } from "@/lib/preview";
 import { CAT, TAG_LABEL } from "@/lib/categories";
 import { sampleReviews } from "@/lib/demo-data";
 import { distanceKm, formatDistance, formatWalk } from "@/lib/geo";
@@ -75,7 +76,7 @@ export default function ActivityPage() {
 
   // OSM places outside the current search area are fetched by id
   useEffect(() => {
-    if (!hydrated || findActivity(id) || fetched || !id.startsWith("osm-")) return;
+    if (!hydrated || PREVIEW || findActivity(id) || fetched || !id.startsWith("osm-")) return;
     setFetchState("loading");
     fetch(`/api/place?id=${encodeURIComponent(id)}`)
       .then(async (r) => {
@@ -133,10 +134,14 @@ export default function ActivityPage() {
         await navigator.share({ title: a.name, text: a.summary, url });
         return;
       }
+    } catch (e) {
+      if ((e as Error).name === "AbortError") return; // user closed the share sheet
+    }
+    try {
       await navigator.clipboard.writeText(url);
       toast("Link copied");
     } catch {
-      toast("Couldn't share. Copy the address bar instead.");
+      toast("Couldn't copy. Use your browser's share button instead.");
     }
   };
 

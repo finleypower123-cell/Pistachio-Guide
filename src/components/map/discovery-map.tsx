@@ -6,6 +6,7 @@ import { Map, MapControls, MapGeoJSON, MapMarker, MarkerContent, useMap } from "
 import { useApp } from "@/components/providers/app-provider";
 import { useUser } from "@/components/providers/user-provider";
 import { offsetKm } from "@/lib/geo";
+import { PREVIEW } from "@/lib/preview";
 import type { Activity, Place } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -57,6 +58,7 @@ export function DiscoveryMap({
   return (
     <div className={cn("relative overflow-hidden rounded-[22px] bg-surface-2", className)}>
       <Map
+        blank={PREVIEW}
         center={[place.lng, place.lat]}
         zoom={13.4}
         className="h-full w-full"
@@ -113,6 +115,11 @@ export function DiscoveryMap({
           onLocate={(c) => setPlace({ label: "Near you", lat: c.latitude, lng: c.longitude })}
         />
       </Map>
+      {PREVIEW && (
+        <span className="pointer-events-none absolute left-3 top-3 rounded-full bg-surface/95 px-3 py-1.5 text-xs font-bold shadow-card">
+          Preview map · streets load in the full app
+        </span>
+      )}
     </div>
   );
 }

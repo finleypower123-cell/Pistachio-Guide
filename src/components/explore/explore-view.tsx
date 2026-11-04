@@ -126,6 +126,8 @@ export function ExploreView({ initialView = "list" }: { initialView?: "list" | "
       <span>
         {osmError} <button type="button" onClick={retryOsm} className="font-extrabold underline">Retry</button>
       </span>
+    ) : osmStatus === "off" ? (
+      <span>Preview: demo listings only. Real OpenStreetMap places load in the full app.</span>
     ) : osmStatus === "ok" ? (
       <span>{osmCount} real places from OpenStreetMap, plus demo listings</span>
     ) : null;

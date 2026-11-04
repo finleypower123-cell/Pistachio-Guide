@@ -5,10 +5,11 @@ import { applyOverlay, loadOverlays, type BusinessRecord } from "@/lib/business"
 import { demoActivities } from "@/lib/demo-data";
 import { DEFAULT_PLACE } from "@/lib/geo";
 import { defaultFilters, type Filters } from "@/lib/search";
+import { PREVIEW } from "@/lib/preview";
 import { local } from "@/lib/storage";
 import type { Activity, Place, Weather } from "@/lib/types";
 
-type OsmStatus = "idle" | "loading" | "ok" | "error";
+type OsmStatus = "idle" | "loading" | "ok" | "error" | "off";
 
 interface AppState {
   place: Place;
@@ -65,6 +66,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // Real places from OpenStreetMap around the chosen location
   useEffect(() => {
     if (!hydrated) return;
+    if (PREVIEW) {
+      setOsmStatus("off");
+      return;
+    }
     const ctrl = new AbortController();
     setOsmStatus("loading");
     setOsmError(null);
@@ -86,7 +91,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   // Current weather for weather-smart suggestions
   useEffect(() => {
-    if (!hydrated) return;
+    if (!hydrated || PREVIEW) return;
     setWeather(null);
     fetch(`/api/weather?lat=${place.lat}&lng=${place.lng}`)
       .then((r) => (r.ok ? r.json() : null))
