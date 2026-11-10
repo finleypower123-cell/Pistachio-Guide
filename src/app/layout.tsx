@@ -11,12 +11,18 @@ import { SiteHeader } from "@/components/layout/site-header";
 import { AppProvider } from "@/components/providers/app-provider";
 import { UserProvider } from "@/components/providers/user-provider";
 import { ToastProvider } from "@/components/ui/toast";
+import { SITE_DESCRIPTION, SITE_NAME, SITE_TAGLINE, SITE_URL } from "@/lib/site";
 
 export const metadata: Metadata = {
-  title: { default: "Pistachio Guide — Find the fun stuff", template: "%s · Pistachio Guide" },
-  description: "Find hidden gems, weird little adventures and brilliant things to do near you.",
-  applicationName: "Pistachio Guide",
+  metadataBase: new URL(SITE_URL),
+  title: { default: `${SITE_NAME} — ${SITE_TAGLINE}`, template: `%s · ${SITE_NAME}` },
+  description: SITE_DESCRIPTION,
+  applicationName: SITE_NAME,
   appleWebApp: { capable: true, title: "Pistachio", statusBarStyle: "default" },
+  icons: { apple: "/icons/apple-touch-icon.png" },
+  // What a shared link looks like in a chat or on social media. The picture is src/app/opengraph-image.tsx.
+  openGraph: { type: "website", siteName: SITE_NAME, title: `${SITE_NAME} — ${SITE_TAGLINE}`, description: SITE_DESCRIPTION, locale: "en_GB", url: "/" },
+  twitter: { card: "summary_large_image", title: `${SITE_NAME} — ${SITE_TAGLINE}`, description: SITE_DESCRIPTION },
 };
 
 export const viewport: Viewport = {

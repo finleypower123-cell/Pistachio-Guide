@@ -84,3 +84,10 @@ tests/logic.test.ts    unit tests
 ## Credits
 
 Map components from [mapcn](https://github.com/AnmolSaini16/mapcn), Supabase helpers from [nextjs-supabase-shadcn-boilerplate](https://github.com/Barty-Bart/nextjs-supabase-shadcn-boilerplate), OSM category mapping from [TRIP](https://github.com/itskovacs/TRIP), tile setup informed by [nextjs-maplibre-starter](https://github.com/wellywahyudi/nextjs-maplibre-starter). All MIT; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Map data © OpenStreetMap contributors.
+
+## Launch settings
+
+- `NEXT_PUBLIC_SITE_URL`: the site's public address (for example `https://pistachio.guide`), used in share previews, `robots.txt` and `sitemap.xml`. On Vercel the production address is used automatically until this is set; set it once the site has its own domain.
+- Share preview image: `src/app/opengraph-image.tsx`. App icons: `public/icons/` (192, 512, maskable and Apple touch), generated from `src/app/icon.svg`.
+- Every pull request and every push to `main` runs the tests, type check, lint and a production build (`.github/workflows/ci.yml`).
+
