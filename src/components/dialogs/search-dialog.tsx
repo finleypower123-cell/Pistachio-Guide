@@ -18,11 +18,12 @@ export const EXAMPLE_QUERIES = [
 ];
 
 export function useRunQuery() {
-  const { setFilters, setUnderstood } = useApp();
+  const { setFilters, setUnderstood, activities, filters: current } = useApp();
   const router = useRouter();
   return (q: string) => {
-    const { filters, understood } = parseQuery(q);
-    setFilters({ ...defaultFilters(), ...filters });
+    const { filters, understood } = parseQuery(q, activities);
+    // Keep the chosen search distance unless the search itself names one ("walking distance").
+    setFilters({ ...defaultFilters(), maxDistKm: current.maxDistKm, ...filters });
     setUnderstood(understood);
     router.push("/explore");
   };

@@ -14,10 +14,15 @@ import { Sheet } from "@/components/ui/sheet";
 import { SHOW_DEMO } from "@/lib/preview";
 import { CAT } from "@/lib/categories";
 import { distanceKm, formatWalk } from "@/lib/geo";
-import { applyFilters, availableDetails, defaultFilters, loadRangeKm, MOODS, parseQuery, RANGE_OPTIONS, type Filters, type SortKey } from "@/lib/search";
+import { applyFilters, availableDetails, defaultFilters, loadRangeKm, MOODS, parseQuery, RANGE_OPTIONS, relaxFilters, type Filters, type SortKey } from "@/lib/search";
 import type { Activity, CategoryId, Tag } from "@/lib/types";
 import { cn, priceLabel } from "@/lib/utils";
 import { activeFilterChips, distanceOptions, FiltersPanel } from "./filters-panel";
+
+/** "prices", "prices and ratings", "prices, ratings and group size". */
+function listPhrase(items: string[]) {
+  return items.length < 2 ? (items[0] ?? "") : `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
+}
 
 const QUICK_CATS: CategoryId[] = ["indiecafe", "park", "swim", "leisure", "escape", "arcade", "museum", "art", "live", "climbing", "vintage", "market"];
 
@@ -89,7 +94,7 @@ export function ExploreView({ initialView = "list" }: { initialView?: "list" | "
       labels.push(`Mood: ${mood.label}`);
     }
     if (query) {
-      const p = parseQuery(query);
+      const p = parseQuery(query, activities);
       Object.assign(next, p.filters);
       labels.push(...p.understood);
       setQ(query);
@@ -99,7 +104,9 @@ export function ExploreView({ initialView = "list" }: { initialView?: "list" | "
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paramKey]);
 
-  const results = useMemo(() => applyFilters(activities, filters, place, weather), [activities, filters, place, weather]);
+  // Filters the loaded places hold no data for are set aside, with a note saying so, instead of emptying the list.
+  const relaxed = useMemo(() => relaxFilters(filters, activities), [filters, activities]);
+  const results = useMemo(() => applyFilters(activities, relaxed.filters, place, weather), [activities, relaxed, place, weather]);
   const chips = activeFilterChips(filters);
   const selectedA = results.find((a) => a.id === selected) ?? null;
 
@@ -113,7 +120,7 @@ export function ExploreView({ initialView = "list" }: { initialView?: "list" | "
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    const p = parseQuery(q);
+    const p = parseQuery(q, activities);
     // A new search keeps the chosen distance unless the search itself names one ("walking distance").
     setFilters({ ...defaultFilters(), sort: filters.sort, sources: filters.sources, maxDistKm: filters.maxDistKm, ...p.filters });
     setUnderstood(p.understood);
@@ -124,6 +131,12 @@ export function ExploreView({ initialView = "list" }: { initialView?: "list" | "
   const has = useMemo(() => availableDetails(activities), [activities]);
   const quickCats = activities.length ? QUICK_CATS.filter((c) => has.categories.has(c) || filters.categories.includes(c)) : QUICK_CATS;
   const widerKm = RANGE_OPTIONS.find((km) => km > filters.maxDistKm);
+  // The five most common kinds of place loaded, offered when a search comes back empty.
+  const nearbyKinds = useMemo(() => {
+    const counts = new Map<CategoryId, number>();
+    for (const a of activities) if (a.category !== "chaincafe") counts.set(a.category, (counts.get(a.category) ?? 0) + 1);
+    return [...counts.entries()].sort((x, y) => y[1] - x[1]).slice(0, 5);
+  }, [activities]);
   // The map stays quick with a couple of hundred pins; the list holds everything.
   const onMap = useMemo(() => results.slice(0, 200), [results]);
   const mapZoom = { 5: 13.4, 10: 11.6, 25: 10.3 }[loadRangeKm(filters.maxDistKm)] ?? 13.4;
@@ -179,6 +192,12 @@ export function ExploreView({ initialView = "list" }: { initialView?: "list" | "
         {understood.length > 0 && (
           <p className="text-sm text-ink-soft">
             Understood: <span className="font-bold text-ink">{understood.join(" · ")}</span>
+          </p>
+        )}
+
+        {relaxed.ignored.length > 0 && (
+          <p className="rounded-2xl bg-surface-2 px-4 py-3 text-sm text-ink-soft" role="status">
+            We don&apos;t know {listPhrase(relaxed.ignored)} for places around here yet, so we&apos;ve left that out and shown everything else that fits.
           </p>
         )}
 
@@ -287,6 +306,28 @@ export function ExploreView({ initialView = "list" }: { initialView?: "list" | "
                   <button type="button" onClick={() => setFilters((p) => ({ ...p, maxDistKm: widerKm }))} className="rounded-full border border-line px-3 py-1.5 text-sm font-bold">Widen to {widerKm} km</button>
                 )}
               </div>
+              {/* What there actually is nearby, so an empty search still leads somewhere */}
+              {nearbyKinds.length > 0 && (
+                <div className="mt-6 border-t border-line pt-5">
+                  <p className="text-sm font-bold text-ink-soft">Or see what&apos;s around {place.label}</p>
+                  <div className="mt-3 flex flex-wrap justify-center gap-2">
+                    {nearbyKinds.map(([c, n]) => (
+                      <button
+                        key={c}
+                        type="button"
+                        onClick={() => {
+                          setQ("");
+                          setUnderstood([]);
+                          setFilters({ ...defaultFilters(), sort: filters.sort, sources: filters.sources, maxDistKm: filters.maxDistKm, categories: [c] });
+                        }}
+                        className="rounded-full bg-surface-2 px-3 py-1.5 text-sm font-bold text-ink"
+                      >
+                        {CAT[c].label} <span className="font-semibold opacity-70">{n}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           ) : view === "list" ? (
             <>

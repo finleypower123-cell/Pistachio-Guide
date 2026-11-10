@@ -3,7 +3,7 @@ import { parseOsmHours, isOpenAt } from "../src/lib/hours";
 import { elementToActivity, buildAroundQuery, elementsToPlaces } from "../src/lib/osm";
 import { loadNearbyPlaces, loadPlaceById, timing } from "../src/lib/discover";
 import { PHOTON_GROUPS, photonPacing, photonToElement } from "../src/lib/places-fallback";
-import { parseQuery, applyFilters, defaultFilters, loadRangeKm } from "../src/lib/search";
+import { parseQuery, applyFilters, defaultFilters, loadRangeKm, editDistance, fixTypos, matchesText, relaxFilters } from "../src/lib/search";
 import { demoActivities } from "../src/lib/demo-data";
 
 // Hours
@@ -76,6 +76,57 @@ assert.equal(pe.type, "node");
 assert.equal(pe.lat, 50.8479);
 assert.equal(elementToActivity(pe)!.address, "Galerie du Roi, Bruxelles, 1000");
 assert.equal(photonToElement({ properties: { osm_id: 1, osm_type: "N", osm_key: "amenity", osm_value: "cafe" } }), null, "unnamed skipped");
+
+// ---- search that copes with typos, accents and other wording ----
+{
+  const mk = (id: number, tags: Record<string, string>, dLat = 0) => elementToActivity({ type: "node", id, lat: 50.85 + dLat, lon: 4.35, tags })!;
+  const real = [
+    mk(1, { tourism: "museum", name: "Musée Magritte" }),
+    mk(2, { amenity: "cafe", name: "Café Parc Royal" }, 0.001),
+    mk(3, { amenity: "cafe", name: "Kaffabar" }, 0.002),
+    mk(4, { amenity: "cafe", name: "Bean There" }, 0.003),
+    mk(5, { leisure: "escape_game", name: "Quest Room" }, 0.02),
+    mk(6, { leisure: "park", name: "Parc de Bruxelles" }, 0.004),
+  ];
+  const centre = { label: "x", lat: 50.85, lng: 4.35 };
+  const run = (q: string) => applyFilters(real, { ...defaultFilters(), ...parseQuery(q, real).filters }, centre);
+
+  assert.equal(editDistance("musuem", "museum"), 1, "a swap of neighbouring letters is one edit");
+  assert.equal(editDistance("cofee", "coffee"), 1);
+  assert.equal(fixTypos("Musuem near me"), "museum near me");
+  assert.equal(fixTypos("art"), "art", "short words are never changed");
+
+  assert.deepEqual(run("musuem").map((a) => a.id), ["osm-node-1"], "typo fixed");
+  assert.equal(parseQuery("musuem").corrected, "museum", "read as the category when no loaded place matches the text");
+  assert.deepEqual(parseQuery("cofee shop").filters.categories, ["indiecafe", "boardgame", "chaincafe"]);
+  assert.deepEqual(run("musée").map((a) => a.id), ["osm-node-1"], "accents and French understood");
+  assert.equal(run("cofee").length, 3);
+  assert.equal(run("zwembad").length, 0, "understood as swimming; none loaded");
+  assert.deepEqual(parseQuery("zwembad", real).filters.categories, ["swim"]);
+
+  // A real place name wins over a "correction", with or without accents and small slips
+  assert.deepEqual(run("Kaffabar").map((a) => a.id), ["osm-node-3"]);
+  assert.equal(parseQuery("Kaffabar", real).corrected, undefined);
+  assert.deepEqual(run("magrite").map((a) => a.id), ["osm-node-1"], "typo in a name");
+  assert.ok(matchesText(real[0], "musee magritte"));
+  assert.ok(!matchesText(real[0], "louvre"));
+
+  // "Something unusual" works for real places through the kind of place
+  assert.deepEqual(run("something weird").map((a) => a.id), ["osm-node-5"]);
+
+  // Filters with no data behind them are set aside and named, not allowed to empty the list
+  const kids = { ...defaultFilters(), ...parseQuery("something fun for kids under £10", real).filters };
+  assert.equal(applyFilters(real, kids, centre).length, 0);
+  const relaxed = relaxFilters(kids, real);
+  assert.deepEqual(relaxed.ignored, ["family-friendly", "prices"]);
+  assert.equal(applyFilters(real, relaxed.filters, centre).length, real.length);
+  assert.deepEqual(relaxFilters({ ...defaultFilters(), setting: "indoor" }, real).ignored, [], "filters with data are kept");
+  assert.deepEqual(relaxFilters(kids, []).ignored, [], "nothing is dropped before places have loaded");
+
+  // Best match mixes kinds of place: the three cafés don't take the first three slots
+  const best = applyFilters(real, defaultFilters(), centre).map((a) => a.category);
+  assert.ok(new Set(best.slice(0, 3)).size >= 2, "top of the list is mixed: " + best.join(","));
+}
 
 // Real places: our API route first, then Photon straight from the browser
 async function fallbackTests() {
