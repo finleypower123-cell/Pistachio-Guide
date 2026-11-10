@@ -1,0 +1,45 @@
+name: Live site check
+on:
+  push:
+    branches: [diag/live-check]
+permissions:
+  contents: write
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      BASE: https://pistachio-guide.vercel.app
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Probe
+        run: |
+          {
+            echo "## api/discover on live site"
+            for ll in "lat=51.5145&lng=-0.0875" "lat=50.8467&lng=4.3525"; do
+              curl -sS -m 60 -w "\nHTTP %{http_code} in %{time_total}s\n" "$BASE/api/discover?$ll&radius=3000" | tail -c 350; echo
+            done
+            echo "## api/geocode on live site"
+            curl -sS -m 30 -w "\nHTTP %{http_code} in %{time_total}s\n" "$BASE/api/geocode?q=Brussels" | tail -c 300; echo
+            echo "## Overpass direct from runner"
+            node -e 'const {buildAroundQuery}=require("./diag/q.cjs");' 2>/dev/null || true
+            Q='[out:json][timeout:25];(nwr(around:3000,50.84500,4.35000)["amenity"="cafe"]["name"];nwr(around:3000,50.84500,4.35000)["leisure"~"^(park|garden|water_park|bowling_alley|miniature_golf|amusement_arcade|escape_game|trampoline_park|sports_centre)$"]["name"];nwr(around:3000,50.84500,4.35000)["leisure"="swimming_pool"]["name"]["access"!~"^(private|no|customers)$"];nwr(around:3000,50.84500,4.35000)["amenity"~"^(cinema|theatre|arts_centre|marketplace)$"]["name"];nwr(around:3000,50.84500,4.35000)["tourism"~"^(museum|gallery|attraction|viewpoint)$"]["name"];nwr(around:3000,50.84500,4.35000)["shop"~"^(second_hand|charity|games)$"]["name"];nwr(around:3000,50.84500,4.35000)["sport"="climbing"]["name"];);out center tags 250;'
+            for u in https://overpass-api.de/api/interpreter https://overpass.private.coffee/api/interpreter https://maps.mail.ru/osm/tools/overpass/api/interpreter https://overpass.osm.ch/api/interpreter; do
+              echo "-- $u"
+              curl -sS -m 45 -D /tmp/h -o /tmp/b -w "HTTP %{http_code} in %{time_total}s size %{size_download}\n" -H "Origin: $BASE" --data-urlencode "data=$Q" "$u" || true
+              grep -i "access-control-allow-origin\|content-type" /tmp/h || true
+              head -c 250 /tmp/b | tr '\n' ' '; echo; grep -o '"remark"[^}]*' /tmp/b | head -1
+              python3 -c "import json;print('elements',len(json.load(open('/tmp/b')).get('elements',[])))" 2>/dev/null || true
+            done
+            echo "## Browser test"
+            npm i --no-save playwright >/dev/null 2>&1 && npx playwright install --with-deps chromium >/dev/null 2>&1
+            node diag/check.cjs
+          } > /tmp/out.txt 2>&1 || true
+          cat /tmp/out.txt
+          python3 - <<'PY'
+          import json
+          t=open('/tmp/out.txt').read()[-60000:]
+          json.dump({"body":"```\n"+t+"\n```"},open('/tmp/c.json','w'))
+          PY
+          gh api repos/${{ github.repository }}/commits/${{ github.sha }}/comments --input /tmp/c.json --jq .html_url
