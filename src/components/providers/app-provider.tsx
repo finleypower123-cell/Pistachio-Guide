@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { applyOverlay, loadOverlays, type BusinessRecord } from "@/lib/business";
 import { demoActivities } from "@/lib/demo-data";
 import { loadNearbyPlaces } from "@/lib/discover";
@@ -46,6 +46,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [osmStatus, setOsmStatus] = useState<OsmStatus>("idle");
   const [osmError, setOsmError] = useState<string | null>(null);
   const [osmNonce, setOsmNonce] = useState(0);
+  const lastNonce = useRef(0);
   const [overlays, setOverlays] = useState<BusinessRecord[]>([]);
   const [filters, setFilters] = useState<Filters>(defaultFilters);
   const [understood, setUnderstood] = useState<string[]>([]);
@@ -74,7 +75,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const ctrl = new AbortController();
     setOsmStatus("loading");
     setOsmError(null);
-    loadNearbyPlaces(place.lat, place.lng, 3000, ctrl.signal)
+    // Retry skips the on-device cache; a plain reload or location change may use it.
+    const fresh = osmNonce !== lastNonce.current;
+    lastNonce.current = osmNonce;
+    loadNearbyPlaces(place.lat, place.lng, 3000, ctrl.signal, { fresh })
       .then((places) => {
         if (ctrl.signal.aborted) return;
         setOsm(places);

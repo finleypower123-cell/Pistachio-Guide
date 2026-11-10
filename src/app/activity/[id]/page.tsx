@@ -72,19 +72,33 @@ export default function ActivityPage() {
   const [photo, setPhoto] = useState(0);
   const logged = useRef<string | null>(null);
 
-  const a: Activity | undefined =
-    findActivity(id) ?? fetched ?? saved.find((s) => s.id === id)?.snapshot ?? recent.find((r) => r.id === id)?.snapshot;
+  // A place known only by name, type and location is swapped for its full record once that loads.
+  const listed = findActivity(id);
+  const a: Activity | undefined = useMemo(
+    () =>
+      (listed?.partial && fetched ? { ...fetched, address: fetched.address ?? listed.address } : listed) ??
+      fetched ??
+      saved.find((s) => s.id === id)?.snapshot ??
+      recent.find((r) => r.id === id)?.snapshot,
+    [listed, fetched, saved, recent, id],
+  );
 
-  // OSM places outside the current search area are fetched by id
+  // OSM places outside the current search area, or with only basic details, are fetched by id
+  const tried = useRef<string | null>(null);
   useEffect(() => {
-    if (!hydrated || PREVIEW || findActivity(id) || fetched || !id.startsWith("osm-")) return;
-    setFetchState("loading");
+    if (!hydrated || PREVIEW || fetched || !id.startsWith("osm-") || tried.current === id) return;
+    const known = findActivity(id);
+    if (known && !known.partial) return;
+    tried.current = id;
+    if (!known) setFetchState("loading");
     loadPlaceById(id)
       .then((place) => {
         setFetched(place);
         setFetchState("idle");
       })
-      .catch(() => setFetchState("error"));
+      .catch(() => {
+        if (!known) setFetchState("error");
+      });
   }, [id, hydrated, findActivity, fetched]);
 
   useEffect(() => {

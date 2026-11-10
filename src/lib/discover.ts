@@ -1,19 +1,24 @@
-import { buildAroundQuery, buildIdQuery, elementToActivity, elementsToPlaces, roundCoord, runOverpass } from "./osm";
+import { osmApiPlace, photonNearby } from "./places-fallback";
+import { roundCoord } from "./osm";
 import type { Activity } from "./types";
 
 /**
  * Client-side loaders for real OpenStreetMap places.
  *
- * Each one asks our own API route first, because its answers are cached at the CDN. If that
- * route fails or is slow (the public Overpass servers often refuse or throttle requests coming
- * from hosting providers), the browser asks Overpass directly instead.
+ * Nearby places: our API route (Overpass, full records, cached at the CDN) is asked first. The
+ * public Overpass servers often don't answer, so after a short head start the browser also asks
+ * Photon directly and uses whichever real data arrives. Photon is called from the browser, not
+ * our server, because it throttles by IP address and hosting providers share theirs.
+ *
+ * Results are remembered on the device for a while so reloads are instant and the free services
+ * aren't asked again for the same area.
  */
 
-const SERVER_WAIT_MS = 12000;
+export const timing = { headStartMs: 2500, serverWaitMs: 10000 };
 
 async function viaServer<T>(path: string, signal?: AbortSignal): Promise<T> {
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), SERVER_WAIT_MS);
+  const timer = setTimeout(() => ctrl.abort(), timing.serverWaitMs);
   const onAbort = () => ctrl.abort();
   signal?.addEventListener("abort", onAbort);
   try {
@@ -27,21 +32,101 @@ async function viaServer<T>(path: string, signal?: AbortSignal): Promise<T> {
   }
 }
 
-const FRIENDLY = "OpenStreetMap didn't respond. Try again in a minute.";
+const FRIENDLY = "Couldn't load real places just now. Try again in a minute.";
 
-export async function loadNearbyPlaces(lat: number, lng: number, radiusM: number, signal?: AbortSignal): Promise<Activity[]> {
+// ---- on-device cache -------------------------------------------------------------------------
+
+const CACHE_KEY = "pg:places-cache:v1";
+const FULL_TTL_MS = 6 * 3600_000;
+const PARTIAL_TTL_MS = 3600_000;
+const MAX_AREAS = 3;
+
+interface CacheEntry {
+  key: string;
+  at: number;
+  full: boolean;
+  places: Activity[];
+}
+
+function readCache(key: string): Activity[] | null {
   try {
-    const j = await viaServer<{ places: Activity[] }>(`/api/discover?lat=${lat}&lng=${lng}&radius=${radiusM}`, signal);
-    return j.places;
-  } catch (e) {
-    if (signal?.aborted) throw e;
+    if (typeof localStorage === "undefined") return null;
+    const all = JSON.parse(localStorage.getItem(CACHE_KEY) ?? "[]") as CacheEntry[];
+    const hit = all.find((e) => e.key === key);
+    if (!hit || Date.now() - hit.at > (hit.full ? FULL_TTL_MS : PARTIAL_TTL_MS)) return null;
+    return hit.places;
+  } catch {
+    return null;
   }
+}
+
+function writeCache(key: string, places: Activity[], full: boolean) {
   try {
-    return elementsToPlaces(await runOverpass(buildAroundQuery(roundCoord(lat), roundCoord(lng), radiusM), { signal }));
-  } catch (e) {
-    if (signal?.aborted) throw e;
-    throw new Error(FRIENDLY);
+    if (typeof localStorage === "undefined" || !places.length) return;
+    const all = (JSON.parse(localStorage.getItem(CACHE_KEY) ?? "[]") as CacheEntry[]).filter((e) => e.key !== key);
+    all.unshift({ key, at: Date.now(), full, places });
+    localStorage.setItem(CACHE_KEY, JSON.stringify(all.slice(0, MAX_AREAS)));
+  } catch {
+    // Storage full or unavailable: the cache is only a convenience.
   }
+}
+
+// ---- loaders ---------------------------------------------------------------------------------
+
+type Loaded = { places: Activity[]; full: boolean };
+
+export async function loadNearbyPlaces(
+  lat: number,
+  lng: number,
+  radiusM: number,
+  signal?: AbortSignal,
+  opts: { fresh?: boolean } = {},
+): Promise<Activity[]> {
+  const rl = roundCoord(lat);
+  const rg = roundCoord(lng);
+  const key = `${rl},${rg},${radiusM}`;
+  if (!opts.fresh) {
+    const cached = readCache(key);
+    if (cached) return cached;
+  }
+
+  const server: Promise<Loaded> = viaServer<{ places: Activity[] }>(`/api/discover?lat=${lat}&lng=${lng}&radius=${radiusM}`, signal).then((j) => ({
+    places: j.places,
+    full: true,
+  }));
+  server.catch(() => {});
+
+  let headStart: ReturnType<typeof setTimeout> | undefined;
+  const early = await Promise.race([
+    server.catch(() => null),
+    new Promise<"wait">((r) => (headStart = setTimeout(() => r("wait"), timing.headStartMs))),
+  ]);
+  clearTimeout(headStart);
+  if (signal?.aborted) throw new Error("aborted");
+
+  let result: Loaded;
+  if (early && early !== "wait") {
+    result = early;
+  } else {
+    // Our route failed or is slow: ask Photon too, and take whichever real data arrives.
+    const stopBackup = new AbortController();
+    const onAbort = () => stopBackup.abort();
+    signal?.addEventListener("abort", onAbort);
+    const backup: Promise<Loaded> = photonNearby(rl, rg, radiusM, stopBackup.signal).then((places) => ({ places, full: false }));
+    backup.catch(() => {});
+    try {
+      result = await Promise.race([server.catch(() => backup), backup.catch(() => server)]);
+    } catch (e) {
+      if (signal?.aborted) throw e;
+      throw new Error(FRIENDLY);
+    } finally {
+      stopBackup.abort();
+      signal?.removeEventListener("abort", onAbort);
+    }
+  }
+  if (signal?.aborted) throw new Error("aborted");
+  writeCache(key, result.places, result.full);
+  return result.places;
 }
 
 export async function loadPlaceById(id: string, signal?: AbortSignal): Promise<Activity> {
@@ -54,8 +139,7 @@ export async function loadPlaceById(id: string, signal?: AbortSignal): Promise<A
     // A definite "not found" from our route is final; anything else is worth a direct try.
     if (signal?.aborted || (e as { status?: number }).status === 404) throw e;
   }
-  const els = await runOverpass(buildIdQuery(m[1], Number(m[2])), { signal, timeoutMs: 15000 });
-  const place = els.map(elementToActivity).find(Boolean);
+  const place = await osmApiPlace(m[1] as "node" | "way" | "relation", Number(m[2]), signal);
   if (!place) throw new Error("Place not found in OpenStreetMap.");
   return place;
 }

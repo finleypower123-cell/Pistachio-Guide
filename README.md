@@ -19,7 +19,7 @@ Built with Next.js 15, TypeScript, Tailwind CSS 4, MapLibre GL and (optionally) 
 
 | Badge | Source | What we show |
 | --- | --- | --- |
-| **OpenStreetMap** | Overpass API, queried around the chosen location | Only what OSM records: name, location, type, opening hours, website, phone, wheelchair access, address, `fee=no`. No prices, ratings or reviews are invented. |
+| **OpenStreetMap** | Overpass API around the chosen location, with Photon and the OpenStreetMap API as backups | Only what OSM records: name, location, type, opening hours, website, phone, wheelchair access, address, `fee=no`. No prices, ratings or reviews are invented. |
 | **Verified** | A business that claimed its listing and was verified | Their edits, photos, offers and events. |
 | **Demo** | `src/lib/demo-data.ts` | 32 sample listings placed around any location to show the full experience. Labelled everywhere, with sample ratings and reviews marked as such and no real addresses or bookings. |
 
@@ -64,8 +64,8 @@ Once connected, anything saved on a device moves into the user's account when th
 ```
 src/
   app/                 pages (home, explore, map, activity/[id], categories, saved, profile, login, business, about) and API routes
-  app/api/discover     Overpass → activities near a point
-  app/api/place        one OSM place by id
+  app/api/discover     Overpass → activities near a point (the browser falls back to Photon)
+  app/api/place        one OSM place by id (OpenStreetMap API, then Overpass)
   app/api/geocode      Nominatim location search
   app/api/weather      Open-Meteo current weather
   components/map       mapcn MapLibre components + DiscoveryMap
@@ -77,7 +77,8 @@ tests/logic.test.ts    unit tests
 
 ## Notes for production
 
-- The public Overpass and Nominatim servers have fair-use limits. API responses are cached at the CDN for 6 hours (places) and 7 days (geocoding); failures are never cached. For real traffic, run your own Overpass instance or use a commercial provider and change `OVERPASS_ENDPOINTS` in `src/lib/osm.ts`.
+- Real places come from three free OpenStreetMap services, none of which is meant to carry a commercial app's traffic. Overpass (full records, asked from `/api/discover`) is often overloaded or refuses requests, so the browser falls back to Photon (name, type, address and location only), and the OpenStreetMap API fills in hours, website and accessibility when a place is opened. For real traffic, use a paid Overpass or places provider, or host your own, and change `OVERPASS_ENDPOINTS` in `src/lib/osm.ts` and the URLs in `src/lib/places-fallback.ts`.
+- Overpass answers are cached at the CDN for 6 hours and geocoding for 7 days; failures are never cached. Places are also cached on the device (6 hours for full records, 1 hour for basic ones).
 - OpenFreeMap tiles are free with no key. To switch providers, change `defaultStyles` in `src/components/map/map.tsx`.
 - Illustrations stand in for photos until a venue uploads its own.
 
