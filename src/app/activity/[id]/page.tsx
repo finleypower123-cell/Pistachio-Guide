@@ -204,7 +204,7 @@ export default function ActivityPage() {
                 <span className="font-normal text-ink-soft">({a.ratingCount} {isDemo ? "sample ratings" : "ratings"})</span>
               </span>
             )}
-            <span>{formatDistance(km)} · {formatWalk(km)}</span>
+            <span>{formatWalk(km).endsWith("away") ? formatWalk(km) : `${formatDistance(km)} · ${formatWalk(km)}`}</span>
             <span className={cn(status.open === true && "text-ok", status.open === false && "text-warn")}>{status.text}</span>
           </div>
 
