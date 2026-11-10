@@ -16,22 +16,34 @@ jobs:
       - name: Probe
         run: |
           {
-            echo "## api/discover on live site"
-            for ll in "lat=51.5145&lng=-0.0875" "lat=50.8467&lng=4.3525"; do
-              curl -sS -m 60 -w "\nHTTP %{http_code} in %{time_total}s\n" "$BASE/api/discover?$ll&radius=3000" | tail -c 350; echo
-            done
-            echo "## api/geocode on live site"
-            curl -sS -m 30 -w "\nHTTP %{http_code} in %{time_total}s\n" "$BASE/api/geocode?q=Brussels" | tail -c 300; echo
-            echo "## Overpass direct from runner"
-            node -e 'const {buildAroundQuery}=require("./diag/q.cjs");' 2>/dev/null || true
-            Q='[out:json][timeout:25];(nwr(around:3000,50.84500,4.35000)["amenity"="cafe"]["name"];nwr(around:3000,50.84500,4.35000)["leisure"~"^(park|garden|water_park|bowling_alley|miniature_golf|amusement_arcade|escape_game|trampoline_park|sports_centre)$"]["name"];nwr(around:3000,50.84500,4.35000)["leisure"="swimming_pool"]["name"]["access"!~"^(private|no|customers)$"];nwr(around:3000,50.84500,4.35000)["amenity"~"^(cinema|theatre|arts_centre|marketplace)$"]["name"];nwr(around:3000,50.84500,4.35000)["tourism"~"^(museum|gallery|attraction|viewpoint)$"]["name"];nwr(around:3000,50.84500,4.35000)["shop"~"^(second_hand|charity|games)$"]["name"];nwr(around:3000,50.84500,4.35000)["sport"="climbing"]["name"];);out center tags 250;'
-            for u in https://overpass-api.de/api/interpreter https://overpass.private.coffee/api/interpreter https://maps.mail.ru/osm/tools/overpass/api/interpreter https://overpass.osm.ch/api/interpreter; do
-              echo "-- $u"
-              curl -sS -m 45 -D /tmp/h -o /tmp/b -w "HTTP %{http_code} in %{time_total}s size %{size_download}\n" -H "Origin: $BASE" --data-urlencode "data=$Q" "$u" || true
-              grep -i "access-control-allow-origin\|content-type" /tmp/h || true
-              head -c 250 /tmp/b | tr '\n' ' '; echo; grep -o '"remark"[^}]*' /tmp/b | head -1
-              python3 -c "import json;print('elements',len(json.load(open('/tmp/b')).get('elements',[])))" 2>/dev/null || true
-            done
+            UA="PistachioGuide/0.1 (+https://github.com/finleypower123-cell/Pistachio-Guide)"
+            BUA="Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Mobile Safari/537.36"
+            A='(around:3000,50.84500,4.35000)'
+            Q="[out:json][timeout:25];(nwr$A[\"amenity\"=\"cafe\"][\"name\"];nwr$A[\"leisure\"~\"^(park|garden|water_park|bowling_alley|miniature_golf|amusement_arcade|escape_game|trampoline_park|sports_centre)\$\"][\"name\"];nwr$A[\"leisure\"=\"swimming_pool\"][\"name\"][\"access\"!~\"^(private|no|customers)\$\"];nwr$A[\"amenity\"~\"^(cinema|theatre|arts_centre|marketplace)\$\"][\"name\"];nwr$A[\"tourism\"~\"^(museum|gallery|attraction|viewpoint)\$\"][\"name\"];nwr$A[\"shop\"~\"^(second_hand|charity|games)\$\"][\"name\"];nwr$A[\"sport\"=\"climbing\"][\"name\"];);out center tags 250;"
+            LIGHT='[out:json][timeout:10];node(around:500,50.845,4.35)["amenity"="cafe"]["name"];out 5;'
+            probe() { # label url ua query
+              echo "-- $1"
+              curl -sS -m 70 -D /tmp/h -o /tmp/b -w "HTTP %{http_code} in %{time_total}s size %{size_download}\n" -A "$3" -H "Origin: $BASE" -H "Referer: $BASE/" --data-urlencode "data=$4" "$2" || true
+              grep -i "access-control-allow-origin" /tmp/h || echo "(no CORS header)"
+              python3 -c "import json;d=json.load(open('/tmp/b'));print('elements',len(d.get('elements',[])),d.get('remark',''))" 2>/dev/null || (head -c 200 /tmp/b | tr '\n' ' '; echo)
+              rm -f /tmp/b /tmp/h
+            }
+            echo "## Overpass servers, full query"
+            probe "overpass-api.de appUA" https://overpass-api.de/api/interpreter "$UA" "$Q"
+            probe "overpass-api.de browserUA" https://overpass-api.de/api/interpreter "$BUA" "$Q"
+            probe "private.coffee browserUA" https://overpass.private.coffee/api/interpreter "$BUA" "$Q"
+            probe "openstreetmap.fr" https://overpass.openstreetmap.fr/api/interpreter "$BUA" "$Q"
+            probe "nchc.org.tw" https://overpass.nchc.org.tw/api/interpreter "$BUA" "$Q"
+            probe "z.overpass-api.de" https://z.overpass-api.de/api/interpreter "$BUA" "$Q"
+            probe "lz4.overpass-api.de" https://lz4.overpass-api.de/api/interpreter "$BUA" "$Q"
+            probe "maps.mail.ru" https://maps.mail.ru/osm/tools/overpass/api/interpreter "$BUA" "$Q"
+            echo "## Light query"
+            probe "overpass-api.de light" https://overpass-api.de/api/interpreter "$BUA" "$LIGHT"
+            probe "private.coffee light" https://overpass.private.coffee/api/interpreter "$BUA" "$LIGHT"
+            echo "## Nominatim amenity search"
+            curl -sS -m 30 -A "$UA" -w "\nHTTP %{http_code} in %{time_total}s\n" "https://nominatim.openstreetmap.org/search?amenity=cafe&viewbox=4.31,50.87,4.39,50.82&bounded=1&format=jsonv2&extratags=1&limit=40" | python3 -c "import sys,json;t=sys.stdin.read();i=t.rfind('\nHTTP');print(t[i:]);d=json.loads(t[:i]);print(len(d),'results');print(json.dumps(d[0])[:500])" || true
+            echo "## Photon reverse"
+            curl -sS -m 30 -A "$UA" -w "\nHTTP %{http_code} in %{time_total}s\n" "https://photon.komoot.io/reverse?lat=50.845&lon=4.35&radius=3&limit=50&osm_tag=amenity:cafe" | tail -c 500 || true
             echo "## Browser test"
             npm i --no-save playwright >/dev/null 2>&1 && npx playwright install --with-deps chromium >/dev/null 2>&1
             node diag/check.cjs

@@ -19,15 +19,15 @@ const BASE = process.env.BASE;
   const t0 = Date.now();
   await page.goto(BASE + "/explore", { waitUntil: "domcontentloaded" });
   let line = "";
-  for (let i = 0; i < 100; i++) {
+  for (let i = 0; i < 110; i++) {
     await page.waitForTimeout(1000);
     const text = await page.evaluate(() => document.body.innerText);
-    const m = text.match(/[^\n]*(real places from OpenStreetMap|Retry|Preview: demo)[^\n]*/);
+    const m = text.match(/[^\n]*(\d+ real places from OpenStreetMap|Retry|Preview: demo)[^\n]*/);
     if (m) { line = m[0]; break; }
   }
   out.push(`STATUS LINE after ${Math.round((Date.now() - t0) / 1000)}s: ${line || "(still loading / none)"}`);
   const text = await page.evaluate(() => document.body.innerText);
-  out.push("PAGE TEXT: " + text.slice(0, 900).replace(/\n+/g, " | "));
+  out.push("PAGE TEXT: " + text.slice(0, 300).replace(/\n+/g, " | "));
   const scripts = await page.evaluate(() => [...document.scripts].map((s) => s.src).filter(Boolean).length);
   out.push("scripts loaded: " + scripts);
   console.log(out.join("\n"));
