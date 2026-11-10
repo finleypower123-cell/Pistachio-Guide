@@ -15,6 +15,7 @@ import type { Activity } from "./types";
  */
 
 export const timing = { headStartMs: 2500, serverWaitMs: 10000 };
+const SERVER_MAX_RADIUS_M = 5000;
 
 async function viaServer<T>(path: string, signal?: AbortSignal): Promise<T> {
   const ctrl = new AbortController();
@@ -80,7 +81,7 @@ export async function loadNearbyPlaces(
   lng: number,
   radiusM: number,
   signal?: AbortSignal,
-  opts: { fresh?: boolean } = {},
+  opts: { fresh?: boolean; onProgress?: (places: Activity[]) => void } = {},
 ): Promise<Activity[]> {
   const rl = roundCoord(lat);
   const rg = roundCoord(lng);
@@ -90,10 +91,12 @@ export async function loadNearbyPlaces(
     if (cached) return cached;
   }
 
-  const server: Promise<Loaded> = viaServer<{ places: Activity[] }>(`/api/discover?lat=${lat}&lng=${lng}&radius=${radiusM}`, signal).then((j) => ({
-    places: j.places,
-    full: true,
-  }));
+  // Our route serves up to 5 km. Wider searches go straight to Photon, which returns the nearest
+  // places of each kind however far out they are.
+  const server: Promise<Loaded> =
+    radiusM > SERVER_MAX_RADIUS_M
+      ? Promise.reject(new Error("too wide for the server route"))
+      : viaServer<{ places: Activity[] }>(`/api/discover?lat=${lat}&lng=${lng}&radius=${radiusM}`, signal).then((j) => ({ places: j.places, full: true }));
   server.catch(() => {});
 
   let headStart: ReturnType<typeof setTimeout> | undefined;
@@ -112,7 +115,7 @@ export async function loadNearbyPlaces(
     const stopBackup = new AbortController();
     const onAbort = () => stopBackup.abort();
     signal?.addEventListener("abort", onAbort);
-    const backup: Promise<Loaded> = photonNearby(rl, rg, radiusM, stopBackup.signal).then((places) => ({ places, full: false }));
+    const backup: Promise<Loaded> = photonNearby(rl, rg, radiusM, stopBackup.signal, opts.onProgress).then((places) => ({ places, full: false }));
     backup.catch(() => {});
     try {
       result = await Promise.race([server.catch(() => backup), backup.catch(() => server)]);

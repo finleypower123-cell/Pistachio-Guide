@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
-import { Heart } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Heart, Search } from "lucide-react";
 import { Map, MapControls, MapGeoJSON, MapMarker, MarkerContent, useMap } from "@/components/map/map";
 import { useApp } from "@/components/providers/app-provider";
 import { useUser } from "@/components/providers/user-provider";
-import { offsetKm } from "@/lib/geo";
-import { PREVIEW } from "@/lib/preview";
+import { distanceKm, offsetKm } from "@/lib/geo";
+import { PREVIEW, SHOW_DEMO } from "@/lib/preview";
 import type { Activity, Place } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -20,18 +20,49 @@ function circle(center: Place, km: number) {
   return { type: "Feature" as const, properties: {}, geometry: { type: "Polygon" as const, coordinates: [coords] } };
 }
 
-/** Keeps the camera in step with the chosen location and the selected marker. */
-function CameraSync({ center, selected }: { center: Place; selected?: Activity | null }) {
+/** Keeps the camera in step with the chosen location, the search distance and the selected marker. */
+function CameraSync({ center, zoom, selected }: { center: Place; zoom: number; selected?: Activity | null }) {
   const { map, isLoaded } = useMap();
+  const lastZoom = useRef(zoom);
+  const { lat, lng } = center;
   useEffect(() => {
     if (!map || !isLoaded) return;
-    map.flyTo({ center: [center.lng, center.lat], zoom: 13.4, duration: 900, essential: true });
-  }, [map, isLoaded, center.lat, center.lng]);
+    const c = map.getCenter();
+    const alreadyThere = distanceKm({ lat: c.lat, lng: c.lng }, { lat, lng }) < 0.3;
+    const zoomChanged = lastZoom.current !== zoom;
+    lastZoom.current = zoom;
+    // "Search this area" keeps the view the person chose; anything else moves the camera.
+    if (alreadyThere && !zoomChanged) return;
+    map.flyTo({ center: [lng, lat], zoom, duration: 900, essential: true });
+  }, [map, isLoaded, lat, lng, zoom]);
   useEffect(() => {
     if (!map || !isLoaded || !selected) return;
     const b = map.getBounds();
     if (!b.contains([selected.lng, selected.lat])) map.easeTo({ center: [selected.lng, selected.lat], duration: 600 });
   }, [map, isLoaded, selected]);
+  return null;
+}
+
+/** Reports the map's centre once the person has moved it well away from the searched location. */
+function AreaWatcher({ center, onChange }: { center: Place; onChange: (c: { lat: number; lng: number } | null) => void }) {
+  const { map, isLoaded } = useMap();
+  const { lat, lng } = center;
+  useEffect(() => {
+    if (!map || !isLoaded) return;
+    const check = () => {
+      const c = map.getCenter();
+      const b = map.getBounds();
+      // "Well away" means about a third of the visible map, and at least 1 km.
+      const spanKm = distanceKm({ lat: b.getNorth(), lng: c.lng }, { lat: b.getSouth(), lng: c.lng });
+      const moved = distanceKm({ lat: c.lat, lng: c.lng }, { lat, lng });
+      onChange(moved > Math.max(1, spanKm / 3) ? { lat: c.lat, lng: c.lng } : null);
+    };
+    map.on("moveend", check);
+    check();
+    return () => {
+      map.off("moveend", check);
+    };
+  }, [map, isLoaded, lat, lng, onChange]);
   return null;
 }
 
@@ -42,6 +73,8 @@ export function DiscoveryMap({
   showWalkRing = true,
   className,
   interactive = true,
+  zoom = 13.4,
+  searchArea = false,
 }: {
   activities: Activity[];
   selectedId?: string | null;
@@ -49,25 +82,31 @@ export function DiscoveryMap({
   showWalkRing?: boolean;
   className?: string;
   interactive?: boolean;
+  /** Starting zoom; wider search distances pass a lower value so more of the area is visible. */
+  zoom?: number;
+  /** Offer a "Search this area" button once the map has been moved away from the searched location. */
+  searchArea?: boolean;
 }) {
   const { place, setPlace } = useApp();
   const { isSaved } = useUser();
   const ring = useMemo(() => circle(place, 1.2), [place]);
   const selected = activities.find((a) => a.id === selectedId) ?? null;
+  const [movedTo, setMovedTo] = useState<{ lat: number; lng: number } | null>(null);
 
   return (
     <div className={cn("relative overflow-hidden rounded-[22px] bg-surface-2", className)}>
       <Map
         blank={PREVIEW}
         center={[place.lng, place.lat]}
-        zoom={13.4}
+        zoom={zoom}
         className="h-full w-full"
         attributionControl={{ compact: true }}
         cooperativeGestures={false}
         dragRotate={false}
         interactive={interactive}
       >
-        <CameraSync center={place} selected={selected} />
+        <CameraSync center={place} zoom={zoom} selected={selected} />
+        {searchArea && <AreaWatcher center={place} onChange={setMovedTo} />}
         {showWalkRing && (
           <MapGeoJSON
             id="walk-ring"
@@ -115,6 +154,18 @@ export function DiscoveryMap({
           onLocate={(c) => setPlace({ label: "Near you", lat: c.latitude, lng: c.longitude })}
         />
       </Map>
+      {searchArea && movedTo && (
+        <button
+          type="button"
+          onClick={() => {
+            setPlace({ label: "Map area", lat: movedTo.lat, lng: movedTo.lng });
+            setMovedTo(null);
+          }}
+          className="absolute left-1/2 top-3 z-10 flex -translate-x-1/2 items-center gap-2 rounded-full bg-primary px-4 py-2.5 text-sm font-extrabold text-on-primary shadow-card"
+        >
+          <Search className="size-4" /> Search this area
+        </button>
+      )}
       {PREVIEW && (
         <span className="pointer-events-none absolute left-3 top-3 rounded-full bg-surface/95 px-3 py-1.5 text-xs font-bold shadow-card">
           Preview map · streets load in the full app
@@ -128,8 +179,8 @@ export function MapLegend() {
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] font-semibold text-ink-soft">
       <span className="inline-flex items-center gap-1.5"><span className="size-3 rounded-full bg-[#2f6f8a]" /> OpenStreetMap</span>
-      <span className="inline-flex items-center gap-1.5"><span className="size-3 rounded-full bg-[#254C38]" /> Demo listing</span>
-      <span className="inline-flex items-center gap-1.5"><span className="size-3 rounded-full bg-[#7da35a]" /> Demo, free</span>
+      {SHOW_DEMO && <span className="inline-flex items-center gap-1.5"><span className="size-3 rounded-full bg-[#254C38]" /> Demo listing</span>}
+      {SHOW_DEMO && <span className="inline-flex items-center gap-1.5"><span className="size-3 rounded-full bg-[#7da35a]" /> Demo, free</span>}
       <span className="inline-flex items-center gap-1.5"><span className="size-3 rounded-full border border-dashed border-[#254C38] bg-[#A8C686]/30" /> ~15 min walk</span>
     </div>
   );

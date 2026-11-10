@@ -11,12 +11,13 @@ import { useApp } from "@/components/providers/app-provider";
 import { ActivityArt } from "@/components/ui/activity-art";
 import { SourceBadge } from "@/components/ui/badges";
 import { Sheet } from "@/components/ui/sheet";
+import { SHOW_DEMO } from "@/lib/preview";
 import { CAT } from "@/lib/categories";
 import { distanceKm, formatWalk } from "@/lib/geo";
-import { applyFilters, defaultFilters, MOODS, parseQuery, type Filters, type SortKey } from "@/lib/search";
+import { applyFilters, availableDetails, defaultFilters, loadRangeKm, MOODS, parseQuery, RANGE_OPTIONS, type Filters, type SortKey } from "@/lib/search";
 import type { Activity, CategoryId, Tag } from "@/lib/types";
 import { cn, priceLabel } from "@/lib/utils";
-import { activeFilterChips, FiltersPanel } from "./filters-panel";
+import { activeFilterChips, distanceOptions, FiltersPanel } from "./filters-panel";
 
 const QUICK_CATS: CategoryId[] = ["indiecafe", "park", "swim", "leisure", "escape", "arcade", "museum", "art", "live", "climbing", "vintage", "market"];
 
@@ -113,22 +114,30 @@ export function ExploreView({ initialView = "list" }: { initialView?: "list" | "
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     const p = parseQuery(q);
-    setFilters({ ...defaultFilters(), sort: filters.sort, sources: filters.sources, ...p.filters });
+    // A new search keeps the chosen distance unless the search itself names one ("walking distance").
+    setFilters({ ...defaultFilters(), sort: filters.sort, sources: filters.sources, maxDistKm: filters.maxDistKm, ...p.filters });
     setUnderstood(p.understood);
   };
 
   const title = filters.price === "free" && chips.length === 1 ? "Free things to do" : "Explore";
 
+  const has = useMemo(() => availableDetails(activities), [activities]);
+  const quickCats = activities.length ? QUICK_CATS.filter((c) => has.categories.has(c) || filters.categories.includes(c)) : QUICK_CATS;
+  const widerKm = RANGE_OPTIONS.find((km) => km > filters.maxDistKm);
+  // The map stays quick with a couple of hundred pins; the list holds everything.
+  const onMap = useMemo(() => results.slice(0, 200), [results]);
+  const mapZoom = { 5: 13.4, 10: 11.6, 25: 10.3 }[loadRangeKm(filters.maxDistKm)] ?? 13.4;
+
   const statusLine =
     osmStatus === "loading" ? (
-      <span className="inline-flex items-center gap-1.5"><Loader2 className="size-3.5 animate-spin" /> Finding real places from OpenStreetMap…</span>
+      <span className="inline-flex items-center gap-1.5"><Loader2 className="size-3.5 animate-spin" /> {osmCount ? "Finding more places…" : "Finding places near you…"}</span>
     ) : osmStatus === "error" ? (
       <span>
         {osmError} <button type="button" onClick={retryOsm} className="font-extrabold underline">Retry</button>
       </span>
     ) : osmStatus === "off" ? (
       <span>Preview: demo listings only. Real OpenStreetMap places load in the full app.</span>
-    ) : osmStatus === "ok" ? (
+    ) : osmStatus === "ok" && SHOW_DEMO ? (
       <span>{osmCount} real places from OpenStreetMap, plus demo listings</span>
     ) : null;
 
@@ -143,15 +152,27 @@ export function ExploreView({ initialView = "list" }: { initialView?: "list" | "
               <button type="button" onClick={() => setLocationOpen(true)} className="font-bold text-ink underline decoration-accent decoration-2 underline-offset-4">
                 {place.label}
               </button>
+              , within{" "}
+              <label htmlFor="range" className="sr-only">Search distance</label>
+              <select
+                id="range"
+                value={filters.maxDistKm}
+                onChange={(e) => setFilters((p) => ({ ...p, maxDistKm: Number(e.target.value) }))}
+                className="rounded-full border border-line bg-surface py-1 pl-2.5 pr-1 text-sm font-bold text-ink"
+              >
+                {distanceOptions(filters.maxDistKm).map(([km, label]) => (
+                  <option key={km} value={km}>{label}</option>
+                ))}
+              </select>
             </p>
           </div>
-          <p className="text-[13px] text-ink-soft" aria-live="polite">{statusLine}</p>
+          {statusLine && <p className="text-[13px] text-ink-soft" aria-live="polite">{statusLine}</p>}
         </div>
 
         <form onSubmit={submit} className="flex items-center gap-2 rounded-2xl border border-line bg-surface p-1.5 pl-4 shadow-card focus-within:border-primary">
           <Search className="size-5 shrink-0 text-ink-soft" />
           <label htmlFor="explore-q" className="sr-only">Search in plain English</label>
-          <input id="explore-q" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Try “weird date idea under £20” or “indoor swim for kids”" className="min-w-0 flex-1 bg-transparent py-2.5 outline-none" />
+          <input id="explore-q" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Try “quirky café nearby” or “museum for a rainy day”" className="min-w-0 flex-1 bg-transparent py-2.5 outline-none" />
           <button type="submit" className="rounded-xl bg-primary px-4 py-2.5 font-extrabold text-on-primary">Search</button>
         </form>
 
@@ -172,7 +193,7 @@ export function ExploreView({ initialView = "list" }: { initialView?: "list" | "
         )}
 
         <div className="no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
-          {QUICK_CATS.map((c) => {
+          {quickCats.map((c) => {
             const on = filters.categories.length === 1 && filters.categories[0] === c;
             return (
               <button key={c} type="button" aria-pressed={on}
@@ -202,8 +223,8 @@ export function ExploreView({ initialView = "list" }: { initialView?: "list" | "
             <select id="sort" value={filters.sort} onChange={(e) => setFilters((p) => ({ ...p, sort: e.target.value as SortKey }))} className="rounded-full border border-line bg-surface px-3 py-2 text-sm font-bold">
               <option value="best">Best match</option>
               <option value="nearest">Nearest</option>
-              <option value="cheapest">Cheapest</option>
-              <option value="rating">Top rated</option>
+              {(has.paid || filters.sort === "cheapest") && <option value="cheapest">Cheapest</option>}
+              {(has.rating || filters.sort === "rating") && <option value="rating">Top rated</option>}
             </select>
             <div className="flex rounded-full border border-line bg-surface p-1" role="group" aria-label="View">
               <button type="button" aria-pressed={view === "list"} onClick={() => setView("list")} className={cn("flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-extrabold", view === "list" && "bg-primary text-on-primary")}>
@@ -228,7 +249,31 @@ export function ExploreView({ initialView = "list" }: { initialView?: "list" | "
             </div>
           )}
 
-          {results.length === 0 ? (
+          {/* The map always shows, even with nothing on it, so it can be moved to search elsewhere. */}
+          {view === "list" && results.length === 0 && (osmStatus === "loading" || osmStatus === "idle") ? (
+            <div className="grid gap-3 sm:grid-cols-2 sm:gap-5 xl:grid-cols-3" aria-busy="true">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="h-28 animate-pulse rounded-[22px] bg-surface-2 sm:h-[320px]" />
+              ))}
+            </div>
+          ) : view === "list" && results.length === 0 && osmStatus === "error" && activities.length === 0 ? (
+            <div className="rounded-[22px] bg-surface p-8 text-center shadow-card">
+              <p className="font-display text-2xl font-bold">Couldn&apos;t load places just now.</p>
+              <p className="mt-2 text-ink-soft">The free map services we use are busy. It usually works again within a minute.</p>
+              <button type="button" onClick={retryOsm} className="mt-4 rounded-full bg-primary px-5 py-2.5 font-extrabold text-on-primary">Try again</button>
+            </div>
+          ) : view === "list" && activities.length === 0 ? (
+            <div className="rounded-[22px] bg-surface p-8 text-center shadow-card">
+              <p className="font-display text-2xl font-bold">No places found around {place.label}.</p>
+              <p className="mt-2 text-ink-soft">Try a wider distance or a different location.</p>
+              <div className="mt-4 flex flex-wrap justify-center gap-2">
+                {widerKm && (
+                  <button type="button" onClick={() => setFilters((p) => ({ ...p, maxDistKm: widerKm }))} className="rounded-full border border-line px-3 py-1.5 text-sm font-bold">Widen to {widerKm} km</button>
+                )}
+                <button type="button" onClick={() => setLocationOpen(true)} className="rounded-full border border-line px-3 py-1.5 text-sm font-bold">Change location</button>
+              </div>
+            </div>
+          ) : view === "list" && results.length === 0 ? (
             <div className="rounded-[22px] bg-surface p-8 text-center shadow-card">
               <p className="font-display text-2xl font-bold">Nothing matches all of that.</p>
               <p className="mt-2 text-ink-soft">Try removing a filter or widening the distance.</p>
@@ -238,14 +283,16 @@ export function ExploreView({ initialView = "list" }: { initialView?: "list" | "
                     Remove “{c.label}”
                   </button>
                 ))}
-                <button type="button" onClick={() => setFilters((p) => ({ ...p, maxDistKm: 5 }))} className="rounded-full border border-line px-3 py-1.5 text-sm font-bold">Widen to 5 km</button>
+                {widerKm && (
+                  <button type="button" onClick={() => setFilters((p) => ({ ...p, maxDistKm: widerKm }))} className="rounded-full border border-line px-3 py-1.5 text-sm font-bold">Widen to {widerKm} km</button>
+                )}
               </div>
             </div>
           ) : view === "list" ? (
             <>
-              <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+              <div className="grid gap-3 sm:grid-cols-2 sm:gap-5 xl:grid-cols-3">
                 {results.slice(0, visible).map((a) => (
-                  <ActivityCard key={a.id} a={a} />
+                  <ActivityCard key={a.id} a={a} row />
                 ))}
               </div>
               {visible < results.length && (
@@ -259,7 +306,7 @@ export function ExploreView({ initialView = "list" }: { initialView?: "list" | "
           ) : (
             <div className="flex flex-col gap-3">
               <div ref={mapBox} className="relative h-[calc(100dvh-230px)] min-h-[340px] scroll-mt-20 md:h-[62dvh] md:min-h-[420px] lg:h-[calc(100dvh-14rem)]">
-                <DiscoveryMap activities={results} selectedId={selected} onSelect={setSelected} className="h-full" />
+                <DiscoveryMap activities={onMap} selectedId={selected} onSelect={setSelected} className="h-full" zoom={mapZoom} searchArea />
                 {selectedA ? (
                   <div className="absolute inset-x-3 bottom-3 z-10 md:max-w-md">
                     <MapPreview a={selectedA} onClose={() => setSelected(null)} />
@@ -267,14 +314,14 @@ export function ExploreView({ initialView = "list" }: { initialView?: "list" | "
                 ) : (
                   /* Swipeable cards over the map on phones; tap one to focus its marker */
                   <div ref={carousel} className="no-scrollbar absolute inset-x-0 bottom-3 z-10 flex snap-x snap-mandatory gap-3 overflow-x-auto px-3 md:hidden">
-                    {results.slice(0, 40).map((a) => (
+                    {onMap.slice(0, 40).map((a) => (
                       <button key={a.id} data-id={a.id} type="button" onClick={() => setSelected(a.id)}
                         className="flex w-[80%] shrink-0 snap-center gap-3 rounded-2xl bg-surface p-2 text-left shadow-card">
                         <span className="block size-16 shrink-0 overflow-hidden rounded-xl"><ActivityArt activity={a} /></span>
                         <span className="min-w-0 py-0.5">
                           <span className="block truncate font-bold">{a.name}</span>
                           <span className="block truncate text-xs font-semibold text-ink-soft">{a.typeLabel ?? CAT[a.category].short} · {formatWalk(distanceKm(place, a))}</span>
-                          <span className="block text-xs font-extrabold">{priceLabel(a.price)}</span>
+                          {a.price != null && <span className="block text-xs font-extrabold">{priceLabel(a.price)}</span>}
                         </span>
                       </button>
                     ))}

@@ -24,6 +24,29 @@ export interface Filters {
   sort: SortKey;
 }
 
+/** Search distances on offer, in km. */
+export const RANGE_OPTIONS = [1, 2, 5, 10, 25] as const;
+
+/** How far out places are loaded for a chosen distance: a few fixed steps, so nearby choices share a load. */
+export function loadRangeKm(maxDistKm: number) {
+  return maxDistKm > 10 ? 25 : maxDistKm > 5 ? 10 : 5;
+}
+
+/** Which optional details the loaded places actually carry, so filters that could never match aren't shown. */
+export function availableDetails(list: Activity[]) {
+  return {
+    paid: list.some((a) => a.price != null && a.price > 0),
+    rating: list.some((a) => a.rating != null),
+    duration: list.some((a) => a.durationMin != null),
+    group: list.some((a) => a.groupMax != null),
+    family: list.some((a) => a.family || a.tags.includes("family")),
+    hours: list.some((a) => a.hours != null),
+    access: list.some((a) => a.accessible === true),
+    tags: new Set(list.flatMap((a) => a.tags)),
+    categories: new Set(list.map((a) => a.category)),
+  };
+}
+
 export const defaultFilters = (): Filters => ({
   text: "",
   categories: [],

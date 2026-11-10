@@ -21,9 +21,8 @@ Built with Next.js 15, TypeScript, Tailwind CSS 4, MapLibre GL and (optionally) 
 | --- | --- | --- |
 | **OpenStreetMap** | Overpass API around the chosen location, with Photon and the OpenStreetMap API as backups | Only what OSM records: name, location, type, opening hours, website, phone, wheelchair access, address, `fee=no`. No prices, ratings or reviews are invented. |
 | **Verified** | A business that claimed its listing and was verified | Their edits, photos, offers and events. |
-| **Demo** | `src/lib/demo-data.ts` | 32 sample listings placed around any location to show the full experience. Labelled everywhere, with sample ratings and reviews marked as such and no real addresses or bookings. |
 
-Booking buttons on demo listings explain that nothing is booked and show the tracked partner link that would be used. Real places link to their own website.
+Real places link to their own website. Sample ("demo") listings from `src/lib/demo-data.ts` appear only in the offline single-file preview (`npm run build:preview`), which can't load real places; the live site never shows them.
 
 ## Run it locally
 

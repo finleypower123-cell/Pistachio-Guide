@@ -158,7 +158,7 @@ export function elementToActivity(el: OsmElement): Activity | null {
   const where = t["addr:street"] ? ` on ${t["addr:street"]}` : "";
   const summary = t.description
     ? t.description.slice(0, 180)
-    : `${m.typeLabel}${where}. Details from OpenStreetMap.`;
+    : `${m.typeLabel}${where}.`;
 
   const website = t.website ?? t["contact:website"];
   const hoursRaw = t.opening_hours;

@@ -7,13 +7,14 @@ import { useApp } from "@/components/providers/app-provider";
 import { Sheet } from "@/components/ui/sheet";
 import { defaultFilters, parseQuery } from "@/lib/search";
 
+/** Searches that real OpenStreetMap places can answer (they carry no prices, group sizes or "date" labels). */
 export const EXAMPLE_QUERIES = [
-  "Something fun for under £15",
-  "A weird date idea near me",
   "Somewhere to go when it's raining",
-  "A fun activity for a group of six",
-  "Free things to do this afternoon",
   "A quirky café within walking distance",
+  "Free things to do outside",
+  "A museum near me",
+  "Somewhere to swim",
+  "A park for a picnic",
 ];
 
 export function useRunQuery() {
