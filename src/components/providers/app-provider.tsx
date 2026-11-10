@@ -5,7 +5,7 @@ import { applyOverlay, loadOverlays, type BusinessRecord } from "@/lib/business"
 import { demoActivities } from "@/lib/demo-data";
 import { loadNearbyPlaces } from "@/lib/discover";
 import { DEFAULT_PLACE } from "@/lib/geo";
-import { defaultFilters, type Filters } from "@/lib/search";
+import { defaultFilters, loadRangeKm, type Filters } from "@/lib/search";
 import { PREVIEW, SHOW_DEMO } from "@/lib/preview";
 import { local } from "@/lib/storage";
 import type { Activity, Place, Weather } from "@/lib/types";
@@ -56,8 +56,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [overlayNonce, setOverlayNonce] = useState(0);
 
   useEffect(() => {
-    setPlaceState(local.get("place", DEFAULT_PLACE));
+    const stored = local.get<Place | null>("place", null);
+    setPlaceState(stored ?? DEFAULT_PLACE);
     setHydrated(true);
+    // First visit: ask where they are rather than silently showing the default city.
+    if (!stored && !PREVIEW && !local.get("asked-location", false)) {
+      local.set("asked-location", true);
+      setLocationOpen(true);
+    }
   }, []);
 
   const setPlace = useCallback((p: Place) => {
@@ -65,7 +71,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     local.set("place", p);
   }, []);
 
-  // Real places from OpenStreetMap around the chosen location
+  // Real places from OpenStreetMap around the chosen location, as far out as the distance filter asks
+  const rangeKm = loadRangeKm(filters.maxDistKm);
   useEffect(() => {
     if (!hydrated) return;
     if (PREVIEW) {
@@ -78,7 +85,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     // Retry skips the on-device cache; a plain reload or location change may use it.
     const fresh = osmNonce !== lastNonce.current;
     lastNonce.current = osmNonce;
-    loadNearbyPlaces(place.lat, place.lng, 3000, ctrl.signal, { fresh })
+    setOsm([]);
+    // Places are shown as they arrive; the status stays "loading" until the search is complete.
+    const onProgress = (places: Activity[]) => {
+      if (!ctrl.signal.aborted) setOsm(places);
+    };
+    loadNearbyPlaces(place.lat, place.lng, rangeKm * 1000, ctrl.signal, { fresh, onProgress })
       .then((places) => {
         if (ctrl.signal.aborted) return;
         setOsm(places);
@@ -91,7 +103,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setOsmError(e.message);
       });
     return () => ctrl.abort();
-  }, [place.lat, place.lng, hydrated, osmNonce]);
+  }, [place.lat, place.lng, hydrated, osmNonce, rangeKm]);
 
   // Current weather for weather-smart suggestions
   useEffect(() => {

@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import { parseOsmHours, isOpenAt } from "../src/lib/hours";
 import { elementToActivity, buildAroundQuery, elementsToPlaces } from "../src/lib/osm";
 import { loadNearbyPlaces, loadPlaceById, timing } from "../src/lib/discover";
-import { photonPacing, photonToElement } from "../src/lib/places-fallback";
-import { parseQuery, applyFilters, defaultFilters } from "../src/lib/search";
+import { PHOTON_GROUPS, photonPacing, photonToElement } from "../src/lib/places-fallback";
+import { parseQuery, applyFilters, defaultFilters, loadRangeKm } from "../src/lib/search";
 import { demoActivities } from "../src/lib/demo-data";
 
 // Hours
@@ -100,7 +100,8 @@ async function fallbackTests() {
     }) as typeof fetch;
   };
   const photonCalls = () => calls.filter((u) => u.includes("photon.komoot.io")).length;
-  const cafesOnly = (url: string) => (url.includes("amenity%3Acafe") ? json({ features: [photonCafe(7), photonCafe(8)] }) : json({}, 500));
+  const cafesOnly = (url: string) =>
+    url.includes("amenity%3Acafe") ? json({ features: [photonCafe(7), photonCafe(8)] }) : url.includes("leisure%3Apark") ? json({}, 500) : json({ features: [] });
   timing.headStartMs = 30;
   photonPacing.gapMs = 0;
   try {
@@ -117,7 +118,7 @@ async function fallbackTests() {
       assert.equal(got[0].id, "osm-node-7");
       assert.equal(got[0].partial, true);
       assert.equal(got[0].hours, null, "no invented hours");
-      assert.equal(photonCalls(), 6);
+      assert.equal(photonCalls(), PHOTON_GROUPS.length);
       assert.equal(maxInFlight, 1, "Photon requests never overlap");
       assert.ok(!calls.some((u) => u.includes("overpass")), "the browser never calls Overpass");
     }
@@ -129,8 +130,20 @@ async function fallbackTests() {
     photonPacing.gapMs = 60;
     assert.equal((await loadNearbyPlaces(50.85, 4.35, 3000))[0].id, "osm-node-1", "full records win when they arrive first");
     await wait(80);
-    assert.ok(photonCalls() < 6, "Photon is stopped once full records arrive");
+    assert.ok(photonCalls() < PHOTON_GROUPS.length, "Photon is stopped once full records arrive");
     photonPacing.gapMs = 0;
+
+    // Wide searches skip our route, show places as they arrive, and ask for the wider radius
+    mock(() => json({ places: [{ id: "osm-node-1" }] }), cafesOnly);
+    const seen: number[] = [];
+    const wide = await loadNearbyPlaces(50.85, 4.35, 25000, undefined, { onProgress: (p) => seen.push(p.length) });
+    assert.equal(wide[0].id, "osm-node-7");
+    assert.deepEqual(seen, [1]);
+    assert.ok(!calls.some((u) => u.startsWith("/api/")), "the 5 km server route is skipped");
+    assert.ok(calls.every((u) => u.includes("radius=25")));
+    assert.equal(loadRangeKm(1.5), 5);
+    assert.equal(loadRangeKm(10), 10);
+    assert.equal(loadRangeKm(25), 25);
 
     // Photon refusing everything: stop after two tries, and show one clear message
     mock(() => new Response("<html>504</html>", { status: 504 }), () => json({}, 504));

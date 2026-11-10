@@ -14,13 +14,21 @@ import type { Activity } from "./types";
 const PHOTON = "https://photon.komoot.io/reverse";
 const OSM_API = "https://api.openstreetmap.org/api/0.6";
 
-/** Place types to ask Photon for, grouped so that common types can't crowd out rare ones. */
+/**
+ * Place types to ask Photon for. Each group is one request returning its 50 nearest matches, so
+ * common types (cafés, parks) get their own group and can't crowd out rarer ones. The order is
+ * the order results appear in while loading: the less ordinary places first.
+ */
 export const PHOTON_GROUPS: string[][] = [
+  ["leisure:escape_game", "leisure:amusement_arcade", "leisure:bowling_alley", "leisure:miniature_golf", "leisure:trampoline_park", "leisure:water_park"],
+  ["tourism:museum"],
   ["amenity:cafe"],
-  ["leisure:park", "leisure:garden"],
-  ["leisure:water_park", "leisure:bowling_alley", "leisure:miniature_golf", "leisure:amusement_arcade", "leisure:escape_game", "leisure:trampoline_park", "leisure:sports_centre", "leisure:swimming_pool"],
-  ["amenity:cinema", "amenity:theatre", "amenity:arts_centre", "amenity:marketplace"],
-  ["tourism:museum", "tourism:gallery", "tourism:attraction", "tourism:viewpoint"],
+  ["leisure:park"],
+  ["amenity:cinema", "amenity:theatre"],
+  ["tourism:gallery", "tourism:attraction", "tourism:viewpoint"],
+  ["amenity:arts_centre", "amenity:marketplace"],
+  ["leisure:sports_centre", "leisure:swimming_pool"],
+  ["leisure:garden"],
   ["shop:second_hand", "shop:charity", "shop:games"],
 ];
 
@@ -83,18 +91,29 @@ function asPartial(a: Activity): Activity {
   };
 }
 
-/** Photon blocks clients that send bursts of requests, so they go out one at a time, at most one a second. */
-export const photonPacing = { gapMs: 1000 };
+/**
+ * Photon blocks clients that send bursts of requests, so they go out strictly one at a time. It
+ * also slows each client to about one answer a second, so no extra gap is needed by default.
+ */
+export const photonPacing = { gapMs: 0 };
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 /**
- * Real places around a point from Photon. Each group of place types is one request (Photon
- * returns the 50 nearest matches per request). Succeeds if at least one group answers.
+ * Real places around a point from Photon, up to 25 km out. Succeeds if at least one group of
+ * place types answers. `onProgress` receives the places found so far after each group, so the
+ * first results can be shown within a second or two.
  */
-export async function photonNearby(lat: number, lng: number, radiusM: number, signal?: AbortSignal): Promise<Activity[]> {
-  const radiusKm = Math.max(0.3, Math.min(5, radiusM / 1000));
+export async function photonNearby(
+  lat: number,
+  lng: number,
+  radiusM: number,
+  signal?: AbortSignal,
+  onProgress?: (places: Activity[]) => void,
+): Promise<Activity[]> {
+  const radiusKm = Math.max(0.3, Math.min(25, radiusM / 1000));
   const els: OsmElement[] = [];
+  const collect = () => elementsToPlaces(els).map(asPartial);
   let answered = 0;
   let failed = 0;
   for (const group of PHOTON_GROUPS) {
@@ -109,19 +128,22 @@ export async function photonNearby(lat: number, lng: number, radiusM: number, si
     try {
       const j = await getJson<{ features?: PhotonFeature[] }>(u.toString(), 8000, signal);
       answered++;
+      let added = 0;
       for (const f of j.features ?? []) {
         const el = photonToElement(f);
-        if (el) els.push(el);
+        if (el) added = els.push(el);
       }
+      if (added && onProgress && !signal?.aborted) onProgress(collect());
     } catch {
       failed++;
       // Two failures with nothing back means the service is down or refusing us; don't keep knocking.
       if (failed >= 2 && !answered) break;
     }
-    if (group !== PHOTON_GROUPS[PHOTON_GROUPS.length - 1]) await sleep(Math.max(0, photonPacing.gapMs - (Date.now() - started)));
+    const gap = photonPacing.gapMs - (Date.now() - started);
+    if (gap > 0 && group !== PHOTON_GROUPS[PHOTON_GROUPS.length - 1]) await sleep(gap);
   }
   if (!answered) throw new Error("Photon unavailable");
-  return elementsToPlaces(els).map(asPartial);
+  return collect();
 }
 
 interface OsmApiElement {

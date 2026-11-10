@@ -84,12 +84,16 @@ export default function Home() {
   const { locate, locating } = useLocateMe();
   const [q, setQ] = useState("");
 
-  const near = useMemo(() => activities.filter((a) => distanceKm(place, a) <= 4), [activities, place]);
-  const top = (fn: (a: Activity) => boolean, n = 10) =>
-    near
-      .filter(fn)
-      .sort((a, b) => score(b, place, weather) - score(a, place, weather))
-      .slice(0, n);
+  const near = useMemo(() => activities.filter((a) => distanceKm(place, a) <= 5), [activities, place]);
+  // Each rail leads with places the rails above haven't shown, so the page doesn't repeat itself.
+  const shown = new Set<string>();
+  const top = (fn: (a: Activity) => boolean, n = 10) => {
+    const ranked = near.filter(fn).sort((a, b) => score(b, place, weather) - score(a, place, weather));
+    const fresh = ranked.filter((a) => !shown.has(a.id));
+    const out = [...fresh, ...ranked.filter((a) => shown.has(a.id))].slice(0, n);
+    out.slice(0, 4).forEach((a) => shown.add(a.id));
+    return out;
+  };
 
   const loading = osmStatus === "loading" || osmStatus === "idle";
   const unusual = top((a) =>
