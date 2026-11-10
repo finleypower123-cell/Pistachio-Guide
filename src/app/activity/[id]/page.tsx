@@ -18,6 +18,7 @@ import { logEvent } from "@/lib/analytics";
 import { PREVIEW } from "@/lib/preview";
 import { CAT, TAG_LABEL } from "@/lib/categories";
 import { sampleReviews } from "@/lib/demo-data";
+import { loadPlaceById } from "@/lib/discover";
 import { distanceKm, formatDistance, formatWalk } from "@/lib/geo";
 import { formatRange, openStatus, weekRows } from "@/lib/hours";
 import type { Activity } from "@/lib/types";
@@ -78,11 +79,9 @@ export default function ActivityPage() {
   useEffect(() => {
     if (!hydrated || PREVIEW || findActivity(id) || fetched || !id.startsWith("osm-")) return;
     setFetchState("loading");
-    fetch(`/api/place?id=${encodeURIComponent(id)}`)
-      .then(async (r) => {
-        const j = await r.json();
-        if (!r.ok) throw new Error(j.error);
-        setFetched(j.place);
+    loadPlaceById(id)
+      .then((place) => {
+        setFetched(place);
         setFetchState("idle");
       })
       .catch(() => setFetchState("error"));
