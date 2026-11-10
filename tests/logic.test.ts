@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { parseOsmHours, isOpenAt } from "../src/lib/hours";
 import { elementToActivity, buildAroundQuery, elementsToPlaces } from "../src/lib/osm";
-import { loadNearbyPlaces, loadPlaceById } from "../src/lib/discover";
+import { loadNearbyPlaces, loadPlaceById, timing } from "../src/lib/discover";
+import { photonPacing, photonToElement } from "../src/lib/places-fallback";
 import { parseQuery, applyFilters, defaultFilters } from "../src/lib/search";
 import { demoActivities } from "../src/lib/demo-data";
 
@@ -61,50 +62,98 @@ for (const q of ["Something fun to do for under £15", "A weird date idea near m
 const cafeEl = (id: number) => ({ type: "node" as const, id, lat: 50.85, lon: 4.35, tags: { amenity: "cafe", name: "Bean There" } });
 assert.equal(elementsToPlaces([cafeEl(1), cafeEl(2)]).length, 1);
 
-// Real places: our API route first, then straight to Overpass from the browser if that fails
+// Chains are recognised by name when the record has no brand tag
+assert.equal(elementToActivity({ type: "node", id: 6, lat: 1, lon: 1, tags: { amenity: "cafe", name: "Starbucks" } })!.category, "chaincafe");
+assert.equal(elementToActivity({ type: "node", id: 6, lat: 1, lon: 1, tags: { amenity: "cafe", name: "Paul's Corner" } })!.category, "indiecafe");
+
+// Photon results map onto the same OSM categories
+const photonCafe = (id: number, name = "Aksum") => ({
+  geometry: { coordinates: [4.3552, 50.8479] as [number, number] },
+  properties: { osm_id: id, osm_type: "N", osm_key: "amenity", osm_value: "cafe", name, street: "Galerie du Roi", city: "Bruxelles", postcode: "1000" },
+});
+const pe = photonToElement(photonCafe(11))!;
+assert.equal(pe.type, "node");
+assert.equal(pe.lat, 50.8479);
+assert.equal(elementToActivity(pe)!.address, "Galerie du Roi, Bruxelles, 1000");
+assert.equal(photonToElement({ properties: { osm_id: 1, osm_type: "N", osm_key: "amenity", osm_value: "cafe" } }), null, "unnamed skipped");
+
+// Real places: our API route first, then Photon straight from the browser
 async function fallbackTests() {
   const realFetch = globalThis.fetch;
-  const calls: { url: string; headers: Record<string, string> }[] = [];
+  const calls: string[] = [];
+  let inFlight = 0;
+  let maxInFlight = 0;
   const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
-  const mock = (serverReply: () => Response | Promise<Response>, overpassReply: (url: string) => Response) => {
+  const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+  const mock = (serverReply: () => Response | Promise<Response>, otherReply: (url: string) => Response) => {
     calls.length = 0;
-    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    maxInFlight = 0;
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
       const url = String(input);
-      calls.push({ url, headers: (init?.headers ?? {}) as Record<string, string> });
-      return url.startsWith("/api/") ? serverReply() : overpassReply(url);
+      calls.push(url);
+      if (url.startsWith("/api/")) return serverReply();
+      inFlight++;
+      maxInFlight = Math.max(maxInFlight, inFlight);
+      await wait(2);
+      inFlight--;
+      return otherReply(url);
     }) as typeof fetch;
   };
+  const photonCalls = () => calls.filter((u) => u.includes("photon.komoot.io")).length;
+  const cafesOnly = (url: string) => (url.includes("amenity%3Acafe") ? json({ features: [photonCafe(7), photonCafe(8)] }) : json({}, 500));
+  timing.headStartMs = 30;
+  photonPacing.gapMs = 0;
   try {
-    // Server route works: Overpass isn't contacted from the browser
+    // Our route answers quickly: nothing else is contacted
     mock(() => json({ places: [{ id: "osm-node-1" }] }), () => json({}, 500));
     assert.equal((await loadNearbyPlaces(50.85, 4.35, 3000)).length, 1);
     assert.equal(calls.length, 1);
 
-    // Server route fails (502, or a non-JSON timeout page): the browser asks Overpass, trying the second server if the first refuses
+    // Our route fails (502, or a non-JSON timeout page): the browser asks Photon, one group of place types at a time
     for (const serverReply of [() => json({ error: "nope", places: [] }, 502), () => new Response("<html>504</html>", { status: 504 })]) {
-      mock(serverReply, (url) => (url.includes("overpass-api.de") ? json({}, 429) : json({ elements: [cafeEl(7)] })));
+      mock(serverReply, cafesOnly);
       const got = await loadNearbyPlaces(50.85, 4.35, 3000);
+      assert.equal(got.length, 1, "duplicates collapsed, failed groups ignored");
       assert.equal(got[0].id, "osm-node-7");
-      assert.equal(calls.length, 3);
+      assert.equal(got[0].partial, true);
+      assert.equal(got[0].hours, null, "no invented hours");
+      assert.equal(photonCalls(), 6);
+      assert.equal(maxInFlight, 1, "Photon requests never overlap");
+      assert.ok(!calls.some((u) => u.includes("overpass")), "the browser never calls Overpass");
     }
 
-    // Everything down: one clear message rather than a parser error
-    mock(() => new Response("<html>504</html>", { status: 504 }), () => json({}, 504));
-    await assert.rejects(loadNearbyPlaces(50.85, 4.35, 3000), /OpenStreetMap didn't respond/);
+    // Our route is slow: Photon is asked after the head start and whichever finishes first is used
+    mock(async () => (await wait(300), json({ places: [{ id: "osm-node-1" }] })), cafesOnly);
+    assert.equal((await loadNearbyPlaces(50.85, 4.35, 3000))[0].id, "osm-node-7");
+    mock(async () => (await wait(40), json({ places: [{ id: "osm-node-1" }] })), cafesOnly);
+    photonPacing.gapMs = 60;
+    assert.equal((await loadNearbyPlaces(50.85, 4.35, 3000))[0].id, "osm-node-1", "full records win when they arrive first");
+    await wait(80);
+    assert.ok(photonCalls() < 6, "Photon is stopped once full records arrive");
+    photonPacing.gapMs = 0;
 
-    // A single place by id falls back the same way, but a definite 404 is final
-    mock(() => json({ error: "down" }, 502), () => json({ elements: [cafeEl(9)] }));
-    assert.equal((await loadPlaceById("osm-node-9")).id, "osm-node-9");
-    mock(() => json({ error: "Place not found in OpenStreetMap." }, 404), () => json({ elements: [cafeEl(9)] }));
+    // Photon refusing everything: stop after two tries, and show one clear message
+    mock(() => new Response("<html>504</html>", { status: 504 }), () => json({}, 504));
+    await assert.rejects(loadNearbyPlaces(50.85, 4.35, 3000), /Couldn't load real places/);
+    assert.equal(photonCalls(), 2);
+
+    // A single place falls back to the OpenStreetMap API: nodes directly, ways centred on their points
+    mock(() => json({ error: "down" }, 502), () => json({ elements: [{ type: "node", id: 9, lat: 50.85, lon: 4.35, tags: { amenity: "cafe", name: "Bean There", opening_hours: "Mo-Su 08:00-17:00" } }] }));
+    const full = await loadPlaceById("osm-node-9");
+    assert.equal(full.id, "osm-node-9");
+    assert.deepEqual(full.hours?.[1], [8, 17]);
+    assert.equal(full.partial, undefined);
+    mock(() => json({ error: "down" }, 502), () =>
+      json({ elements: [{ type: "node", id: 1, lat: 50, lon: 4 }, { type: "node", id: 2, lat: 52, lon: 6 }, { type: "way", id: 5, tags: { leisure: "park", name: "Parc" } }] }));
+    const way = await loadPlaceById("osm-way-5");
+    assert.equal(way.lat, 51);
+    assert.equal(way.lng, 5);
+    assert.ok(calls[1].endsWith("/way/5/full.json"));
+
+    // A definite 404 from our route is final
+    mock(() => json({ error: "Place not found in OpenStreetMap." }, 404), () => json({ elements: [] }));
     await assert.rejects(loadPlaceById("osm-node-9"), /not found/);
     assert.equal(calls.length, 1);
-
-    // In a browser no User-Agent header is set, so the Overpass request needs no CORS preflight
-    (globalThis as { window?: unknown }).window = {};
-    mock(() => json({}, 502), () => json({ elements: [] }));
-    await loadNearbyPlaces(50.85, 4.35, 3000);
-    assert.deepEqual(Object.keys(calls[1].headers), ["Content-Type"]);
-    delete (globalThis as { window?: unknown }).window;
   } finally {
     globalThis.fetch = realFetch;
   }

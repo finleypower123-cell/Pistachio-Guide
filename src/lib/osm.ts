@@ -50,8 +50,14 @@ interface Mapped {
   typeLabel: string;
 }
 
+/** Common café chains, for records that carry no brand tag. */
+const CHAIN_NAME =
+  /^(starbucks|costa( coffee)?|pret( a manger)?|caff[eè] nero|mccaf[eé]|tim hortons|dunkin\b.*|greggs|exki|panos|paul|le pain quotidien|coffee fellows|espresso house|coffee island|segafredo.*|second cup|gloria jean'?s.*|black sheep coffee|coffee ?#?1|joe ?& ?the juice|bagels ?& ?beans|coffee company|tchibo|columbus caf[eé].*)$/i;
+
+const isBranded = (t: Record<string, string>) => Boolean(t.brand || t["brand:wikidata"] || CHAIN_NAME.test((t.name ?? "").trim()));
+
 function classify(t: Record<string, string>): Mapped | null {
-  const branded = Boolean(t.brand || t["brand:wikidata"]);
+  const branded = isBranded(t);
   if (t.sport === "climbing") return { category: "climbing", typeLabel: "Climbing" };
   switch (t.leisure) {
     case "park":
@@ -130,7 +136,7 @@ export function elementToActivity(el: OsmElement): Activity | null {
 
   const isPublicPark = t.leisure === "park";
   const free = t.fee === "no" || isPublicPark;
-  const branded = Boolean(t.brand || t["brand:wikidata"]);
+  const branded = isBranded(t);
   const tags: Tag[] = [];
   const indoorDefault = CAT[m.category].indoorDefault;
   const indoor = t.indoor === "yes" ? true : t.indoor === "no" ? false : indoorDefault;
@@ -202,14 +208,15 @@ export function elementsToPlaces(els: OsmElement[]): Activity[] {
 export const roundCoord = (n: number) => Math.round(n * 200) / 200;
 
 /**
- * Runs a query against each Overpass endpoint in turn. Works on the server and in the browser:
- * the public servers allow cross-origin requests, and this request needs no preflight.
+ * Runs a query against each Overpass endpoint in turn. The public servers are often overloaded
+ * or refuse requests outright, so callers should have a fallback (see places-fallback.ts).
  */
+export const APP_USER_AGENT = "PistachioGuide/0.1 (+https://github.com/finleypower123-cell/Pistachio-Guide)";
+
 export async function runOverpass(query: string, opts: { timeoutMs?: number; signal?: AbortSignal } = {}): Promise<OsmElement[]> {
   const headers: Record<string, string> = { "Content-Type": "application/x-www-form-urlencoded" };
   // Browsers send their own User-Agent; setting one there would force a CORS preflight.
-  if (typeof window === "undefined")
-    headers["User-Agent"] = "PistachioGuide/0.1 (+https://github.com/finleypower123-cell/Pistachio-Guide)";
+  if (typeof window === "undefined") headers["User-Agent"] = APP_USER_AGENT;
   let lastErr: unknown;
   for (const url of OVERPASS_ENDPOINTS) {
     if (opts.signal?.aborted) break;

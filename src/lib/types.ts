@@ -80,6 +80,8 @@ export interface Activity {
   osm?: { type: "node" | "way" | "relation"; id: number };
   /** Plain-language note about what the data source does and doesn't tell us */
   provenance?: string;
+  /** True when only name, type and location are known; the full record is loaded when the place is opened. */
+  partial?: boolean;
 }
 
 export interface BusinessEvent {
