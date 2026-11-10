@@ -3,6 +3,7 @@
 import type { User } from "@supabase/supabase-js";
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { logEvent } from "@/lib/analytics";
+import { SHOW_DEMO } from "@/lib/preview";
 import { local } from "@/lib/storage";
 import { getSupabase } from "@/lib/supabase/client";
 import { hasSupabase } from "@/lib/supabase/config";
@@ -37,6 +38,11 @@ function mergeById<T extends { id: string }>(a: T[], b: T[]) {
   return [...m.values()];
 }
 
+/** Sample listings saved or viewed before they were removed from the live site are dropped. */
+function realOnly<T extends { snapshot?: Activity }>(items: T[]): T[] {
+  return SHOW_DEMO ? items : items.filter((i) => i.snapshot?.source !== "demo");
+}
+
 export function UserProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [displayName, setDisplayName] = useState<string | null>(null);
@@ -48,8 +54,8 @@ export function UserProvider({ children }: { children: ReactNode }) {
   // Device data first, so the UI works instantly and offline.
   useEffect(() => {
     setPrefsState(local.get("prefs", DEFAULT_PREFS));
-    setSaved(local.get("saved", []));
-    setRecent(local.get("recent", []));
+    setSaved(realOnly(local.get("saved", [])));
+    setRecent(realOnly(local.get("recent", [])));
     setDisplayName(local.get<string | null>("name", null));
   }, []);
 
@@ -71,8 +77,8 @@ export function UserProvider({ children }: { children: ReactNode }) {
       const { data } = await sb.from("profiles").select("*").eq("id", user.id).maybeSingle();
       const devSaved = local.get<SavedItem[]>("saved", []);
       const devRecent = local.get<RecentItem[]>("recent", []);
-      const nextSaved = mergeById(devSaved, (data?.saved as SavedItem[]) ?? []);
-      const nextRecent = mergeById(devRecent, (data?.recent as RecentItem[]) ?? [])
+      const nextSaved = realOnly(mergeById(devSaved, (data?.saved as SavedItem[]) ?? []));
+      const nextRecent = realOnly(mergeById(devRecent, (data?.recent as RecentItem[]) ?? []))
         .sort((a, b) => b.viewedAt - a.viewedAt)
         .slice(0, 20);
       const nextPrefs = (data?.prefs as Prefs) ?? local.get("prefs", DEFAULT_PREFS);

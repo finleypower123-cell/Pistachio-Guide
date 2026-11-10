@@ -6,7 +6,7 @@ import { demoActivities } from "@/lib/demo-data";
 import { loadNearbyPlaces } from "@/lib/discover";
 import { DEFAULT_PLACE } from "@/lib/geo";
 import { defaultFilters, type Filters } from "@/lib/search";
-import { PREVIEW } from "@/lib/preview";
+import { PREVIEW, SHOW_DEMO } from "@/lib/preview";
 import { local } from "@/lib/storage";
 import type { Activity, Place, Weather } from "@/lib/types";
 
@@ -110,7 +110,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const activities = useMemo(() => {
     const byId = new Map(overlays.map((o) => [o.activityId, o]));
-    return [...demoActivities(place), ...osm].map((a) => applyOverlay(a, byId.get(a.id)));
+    return [...(SHOW_DEMO ? demoActivities(place) : []), ...osm].map((a) => applyOverlay(a, byId.get(a.id)));
   }, [place, osm, overlays]);
 
   const findActivity = useCallback((id: string) => activities.find((a) => a.id === id), [activities]);

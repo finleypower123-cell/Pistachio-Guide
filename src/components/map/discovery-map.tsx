@@ -6,7 +6,7 @@ import { Map, MapControls, MapGeoJSON, MapMarker, MarkerContent, useMap } from "
 import { useApp } from "@/components/providers/app-provider";
 import { useUser } from "@/components/providers/user-provider";
 import { offsetKm } from "@/lib/geo";
-import { PREVIEW } from "@/lib/preview";
+import { PREVIEW, SHOW_DEMO } from "@/lib/preview";
 import type { Activity, Place } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -128,8 +128,8 @@ export function MapLegend() {
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] font-semibold text-ink-soft">
       <span className="inline-flex items-center gap-1.5"><span className="size-3 rounded-full bg-[#2f6f8a]" /> OpenStreetMap</span>
-      <span className="inline-flex items-center gap-1.5"><span className="size-3 rounded-full bg-[#254C38]" /> Demo listing</span>
-      <span className="inline-flex items-center gap-1.5"><span className="size-3 rounded-full bg-[#7da35a]" /> Demo, free</span>
+      {SHOW_DEMO && <span className="inline-flex items-center gap-1.5"><span className="size-3 rounded-full bg-[#254C38]" /> Demo listing</span>}
+      {SHOW_DEMO && <span className="inline-flex items-center gap-1.5"><span className="size-3 rounded-full bg-[#7da35a]" /> Demo, free</span>}
       <span className="inline-flex items-center gap-1.5"><span className="size-3 rounded-full border border-dashed border-[#254C38] bg-[#A8C686]/30" /> ~15 min walk</span>
     </div>
   );

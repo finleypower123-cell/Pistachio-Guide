@@ -11,6 +11,7 @@ import { useApp } from "@/components/providers/app-provider";
 import { ActivityArt } from "@/components/ui/activity-art";
 import { SourceBadge } from "@/components/ui/badges";
 import { Sheet } from "@/components/ui/sheet";
+import { SHOW_DEMO } from "@/lib/preview";
 import { CAT } from "@/lib/categories";
 import { distanceKm, formatWalk } from "@/lib/geo";
 import { applyFilters, defaultFilters, MOODS, parseQuery, type Filters, type SortKey } from "@/lib/search";
@@ -129,7 +130,7 @@ export function ExploreView({ initialView = "list" }: { initialView?: "list" | "
     ) : osmStatus === "off" ? (
       <span>Preview: demo listings only. Real OpenStreetMap places load in the full app.</span>
     ) : osmStatus === "ok" ? (
-      <span>{osmCount} real places from OpenStreetMap, plus demo listings</span>
+      <span>{osmCount} real places from OpenStreetMap{SHOW_DEMO ? ", plus demo listings" : ""}</span>
     ) : null;
 
   return (
@@ -151,7 +152,7 @@ export function ExploreView({ initialView = "list" }: { initialView?: "list" | "
         <form onSubmit={submit} className="flex items-center gap-2 rounded-2xl border border-line bg-surface p-1.5 pl-4 shadow-card focus-within:border-primary">
           <Search className="size-5 shrink-0 text-ink-soft" />
           <label htmlFor="explore-q" className="sr-only">Search in plain English</label>
-          <input id="explore-q" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Try “weird date idea under £20” or “indoor swim for kids”" className="min-w-0 flex-1 bg-transparent py-2.5 outline-none" />
+          <input id="explore-q" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Try “quirky café nearby” or “museum for a rainy day”" className="min-w-0 flex-1 bg-transparent py-2.5 outline-none" />
           <button type="submit" className="rounded-xl bg-primary px-4 py-2.5 font-extrabold text-on-primary">Search</button>
         </form>
 
@@ -228,7 +229,19 @@ export function ExploreView({ initialView = "list" }: { initialView?: "list" | "
             </div>
           )}
 
-          {results.length === 0 ? (
+          {results.length === 0 && (osmStatus === "loading" || osmStatus === "idle") ? (
+            <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3" aria-busy="true">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="h-[320px] animate-pulse rounded-[22px] bg-surface-2" />
+              ))}
+            </div>
+          ) : results.length === 0 && osmStatus === "error" && chips.length === 0 ? (
+            <div className="rounded-[22px] bg-surface p-8 text-center shadow-card">
+              <p className="font-display text-2xl font-bold">Couldn&apos;t load places just now.</p>
+              <p className="mt-2 text-ink-soft">The free map services we use are busy. It usually works again within a minute.</p>
+              <button type="button" onClick={retryOsm} className="mt-4 rounded-full bg-primary px-5 py-2.5 font-extrabold text-on-primary">Try again</button>
+            </div>
+          ) : results.length === 0 ? (
             <div className="rounded-[22px] bg-surface p-8 text-center shadow-card">
               <p className="font-display text-2xl font-bold">Nothing matches all of that.</p>
               <p className="mt-2 text-ink-soft">Try removing a filter or widening the distance.</p>

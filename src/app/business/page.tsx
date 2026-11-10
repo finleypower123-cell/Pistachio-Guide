@@ -10,6 +10,7 @@ import { useUser } from "@/components/providers/user-provider";
 import { ActivityArt } from "@/components/ui/activity-art";
 import { SourceBadge } from "@/components/ui/badges";
 import { useToast } from "@/components/ui/toast";
+import { SHOW_DEMO } from "@/lib/preview";
 import { claimListing, myBusinesses, type BusinessRecord } from "@/lib/business";
 import { CAT } from "@/lib/categories";
 import type { Activity } from "@/lib/types";
@@ -72,7 +73,7 @@ function ClaimFlow({ preselect, onClaimed }: { preselect?: string | null; onClai
             ))}
             {q.trim().length >= 2 && matches.length === 0 && <li className="py-3 text-sm text-ink-soft">No match nearby. Change location, or add your venue to OpenStreetMap first.</li>}
           </ul>
-          <p className="mt-3 text-xs text-ink-soft">Try “Slow Clay” to explore with a demo listing.</p>
+          {SHOW_DEMO && <p className="mt-3 text-xs text-ink-soft">Try “Slow Clay” to explore with a demo listing.</p>}
         </>
       ) : (
         <form

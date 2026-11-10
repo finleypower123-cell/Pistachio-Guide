@@ -2,6 +2,7 @@
 
 import { useApp } from "@/components/providers/app-provider";
 import { CATEGORIES, COLLECTIONS } from "@/lib/categories";
+import { SHOW_DEMO } from "@/lib/preview";
 import { defaultFilters, type Filters } from "@/lib/search";
 import type { CategoryId, Tag } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -106,13 +107,15 @@ export function FiltersPanel() {
           ))}
         </div>
       </fieldset>
-      <fieldset>
-        <legend className="mb-2 text-[13px] font-extrabold uppercase tracking-wider text-ink-soft">Sources</legend>
-        <div className="flex flex-col gap-1">
-          <Toggle id="f-osm" label="Real places (OpenStreetMap)" checked={f.sources.osm} onChange={(v) => set("sources", { ...f.sources, osm: v })} />
-          <Toggle id="f-demo" label="Demo listings" checked={f.sources.demo} onChange={(v) => set("sources", { ...f.sources, demo: v })} />
-        </div>
-      </fieldset>
+      {SHOW_DEMO && (
+        <fieldset>
+          <legend className="mb-2 text-[13px] font-extrabold uppercase tracking-wider text-ink-soft">Sources</legend>
+          <div className="flex flex-col gap-1">
+            <Toggle id="f-osm" label="Real places (OpenStreetMap)" checked={f.sources.osm} onChange={(v) => set("sources", { ...f.sources, osm: v })} />
+            <Toggle id="f-demo" label="Demo listings" checked={f.sources.demo} onChange={(v) => set("sources", { ...f.sources, demo: v })} />
+          </div>
+        </fieldset>
+      )}
       <button type="button" onClick={() => setFilters({ ...defaultFilters(), sort: f.sort })} className="rounded-full border border-line py-3 font-extrabold">
         Reset filters
       </button>
@@ -137,7 +140,7 @@ export function activeFilterChips(f: Filters): { label: string; clear: (p: Filte
   if (f.accessible) out.push({ label: "Accessible", clear: (p) => ({ ...p, accessible: false }) });
   f.tags.forEach((t) => out.push({ label: COLLECTIONS.find((c) => c.id === t)!.label, clear: (p) => ({ ...p, tags: p.tags.filter((x) => x !== t) }) }));
   f.categories.forEach((c) => out.push({ label: CATEGORIES.find((x) => x.id === c)!.label, clear: (p) => ({ ...p, categories: p.categories.filter((x) => x !== c) }) }));
-  if (!f.sources.osm) out.push({ label: "No OSM places", clear: (p) => ({ ...p, sources: { ...p.sources, osm: true } }) });
-  if (!f.sources.demo) out.push({ label: "No demo listings", clear: (p) => ({ ...p, sources: { ...p.sources, demo: true } }) });
+  if (SHOW_DEMO && !f.sources.osm) out.push({ label: "No OSM places", clear: (p) => ({ ...p, sources: { ...p.sources, osm: true } }) });
+  if (SHOW_DEMO && !f.sources.demo) out.push({ label: "No demo listings", clear: (p) => ({ ...p, sources: { ...p.sources, demo: true } }) });
   return out;
 }

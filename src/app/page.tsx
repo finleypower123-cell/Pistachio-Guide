@@ -11,14 +11,15 @@ import { useApp } from "@/components/providers/app-provider";
 import { ActivityArt } from "@/components/ui/activity-art";
 import { CAT } from "@/lib/categories";
 import { distanceKm } from "@/lib/geo";
-import { MOODS, score } from "@/lib/search";
+import { SHOW_DEMO } from "@/lib/preview";
+import { MOODS, applyFilters, defaultFilters, score } from "@/lib/search";
 import type { Activity, CategoryId } from "@/lib/types";
 
 const HERO_CATS: { id: CategoryId; label: string }[] = [
   { id: "escape", label: "Escape rooms" },
   { id: "arcade", label: "Arcades" },
   { id: "indiecafe", label: "Indie cafés" },
-  { id: "workshop", label: "Workshops" },
+  { id: "museum", label: "Museums" },
   { id: "park", label: "Parks" },
   { id: "swim", label: "Swimming" },
 ];
@@ -47,7 +48,25 @@ function Section({ title, sub, href, children, id }: { title: string; sub?: stri
   );
 }
 
+/** Place types that make a less ordinary day out, used for the first rail and the hero collage. */
+const UNUSUAL_CATS: CategoryId[] = ["escape", "arcade", "boardgame", "bowling", "golf", "climbing", "trampoline", "water", "museum", "art", "market", "vintage"];
+
 function Rail({ items }: { items: Activity[] }) {
+  const { osmStatus, retryOsm } = useApp();
+  if (!items.length && (osmStatus === "loading" || osmStatus === "idle"))
+    return (
+      <div className="rail" aria-busy="true">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="h-[320px] animate-pulse rounded-[22px] bg-surface-2" />
+        ))}
+      </div>
+    );
+  if (!items.length && osmStatus === "error")
+    return (
+      <p className="rounded-2xl bg-surface-2 p-5 text-ink-soft">
+        Couldn&apos;t load places just now. <button type="button" onClick={retryOsm} className="font-extrabold text-ink underline">Retry</button>
+      </p>
+    );
   if (!items.length) return <p className="rounded-2xl bg-surface-2 p-5 text-ink-soft">Nothing here near this location yet.</p>;
   return (
     <div className="rail">
@@ -72,7 +91,10 @@ export default function Home() {
       .sort((a, b) => score(b, place, weather) - score(a, place, weather))
       .slice(0, n);
 
-  const unusual = top((a) => a.source === "demo" && (a.tags.includes("weird") || a.tags.includes("gem")));
+  const loading = osmStatus === "loading" || osmStatus === "idle";
+  const unusual = top((a) =>
+    SHOW_DEMO ? a.source === "demo" && (a.tags.includes("weird") || a.tags.includes("gem")) : a.tags.includes("weird") || UNUSUAL_CATS.includes(a.category),
+  );
   const free = top((a) => a.price === 0);
   const real = top((a) => a.source === "osm" && a.category !== "chaincafe", 12);
   const rainy = top((a) => a.indoor === true);
@@ -82,7 +104,11 @@ export default function Home() {
   const weird = top((a) => a.tags.includes("weird"), 5);
   const featured = near.filter((a) => a.sponsored);
   const deals = near.filter((a) => a.deal);
-  const collage = ["pixel-cellar", "lost-umbrellas", "slow-clay", "paper-moon"].map((id) => activities.find((a) => a.id === id)).filter(Boolean) as Activity[];
+  const collage = SHOW_DEMO
+    ? (["pixel-cellar", "lost-umbrellas", "slow-clay", "paper-moon"].map((id) => activities.find((a) => a.id === id)).filter(Boolean) as Activity[])
+    : [...unusual, ...real.filter((a) => !unusual.includes(a))].slice(0, 4);
+  // Moods and example searches that would come back empty for this area aren't offered.
+  const moods = loading ? MOODS : MOODS.filter((m) => applyFilters(near, { ...defaultFilters(), ...m.filters }, place).length > 0);
 
   return (
     <>
@@ -115,7 +141,7 @@ export default function Home() {
               <div className="flex min-w-0 items-center gap-2 px-3">
                 <Search className="size-5 shrink-0 text-ink-soft" />
                 <label htmlFor="hero-q" className="sr-only">What do you fancy?</label>
-                <input id="hero-q" value={q} onChange={(e) => setQ(e.target.value)} placeholder="What do you fancy? “weird date idea”" className="min-w-0 flex-1 bg-transparent py-3 outline-none" />
+                <input id="hero-q" value={q} onChange={(e) => setQ(e.target.value)} placeholder="What do you fancy? “quirky café nearby”" className="min-w-0 flex-1 bg-transparent py-3 outline-none" />
               </div>
               <button type="button" onClick={() => setLocationOpen(true)} className="flex min-w-0 items-center gap-2 rounded-2xl bg-surface-2 px-4 py-3 text-left font-bold" aria-label={`Location: ${place.label}. Change`}>
                 <MapPin className="size-5 shrink-0 text-accent-ink" />
@@ -179,13 +205,13 @@ export default function Home() {
         </div>
       </section>
 
-      <Section title="Not your usual day out." sub="Hidden arcades, odd little museums and workshops you walk past every day." href="/explore?tag=weird">
+      <Section title="Not your usual day out." sub="Arcades, escape rooms, odd little museums and markets you walk past every day." href={SHOW_DEMO ? "/explore?tag=weird" : `/explore?cat=${UNUSUAL_CATS.join(",")}`}>
         <Rail items={unusual} />
       </Section>
 
       <Section title="Explore by mood" sub="Pick how you feel. We'll handle the rest.">
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-          {MOODS.map((m, i) => (
+          {moods.map((m, i) => (
             <Link key={m.id} href={`/explore?mood=${m.id}`} className={`group flex items-center gap-3 overflow-hidden rounded-[22px] p-3 transition hover:-translate-y-0.5 ${i % 3 === 0 ? "bg-accent text-forest" : i % 3 === 1 ? "bg-surface shadow-card" : "bg-forest text-cream"}`}>
               <span className="block size-14 shrink-0 overflow-hidden rounded-2xl md:size-16">
                 <ActivityArt activity={{ id: `mood-${m.id}`, category: m.icon, name: m.label }} />
@@ -203,17 +229,9 @@ export default function Home() {
         <Rail items={free} />
       </Section>
 
-      <Section title="Real places near you" sub={`Cafés, parks, pools and venues around ${place.label}, straight from OpenStreetMap.`} href="/explore?sort=nearest">
-        {osmStatus === "loading" ? (
-          <div className="rail">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="h-[320px] animate-pulse rounded-[22px] bg-surface-2" />
-            ))}
-          </div>
-        ) : osmStatus === "off" ? (
+      <Section title={SHOW_DEMO ? "Real places near you" : "Near you"} sub={`Cafés, parks, pools and venues around ${place.label}, straight from OpenStreetMap.`} href="/explore?sort=nearest">
+        {osmStatus === "off" ? (
           <p className="rounded-2xl bg-osm-bg p-5 text-osm-ink">This is a preview with demo listings. In the full app, this row fills with real cafés, parks, pools and venues from OpenStreetMap.</p>
-        ) : osmStatus === "error" ? (
-          <p className="rounded-2xl bg-surface-2 p-5 text-ink-soft">OpenStreetMap didn&apos;t respond just now. Demo listings are still shown everywhere else.</p>
         ) : (
           <Rail items={real} />
         )}
@@ -243,14 +261,20 @@ export default function Home() {
         <Rail items={gems} />
       </Section>
 
-      <Section title="Under £20" sub="Good times that won't wreck your week." href="/explore?max=19">
-        <Rail items={under20} />
-      </Section>
+      {/* Prices and "date" or "weird" labels come from business listings, so these appear once some exist nearby. */}
+      {under20.length > 0 && (
+        <Section title="Under £20" sub="Good times that won't wreck your week." href="/explore?max=19">
+          <Rail items={under20} />
+        </Section>
+      )}
 
-      <Section title="Date night without the boring dinner" href="/explore?tag=date">
-        <Rail items={date} />
-      </Section>
+      {date.length > 0 && (
+        <Section title="Date night without the boring dinner" href="/explore?tag=date">
+          <Rail items={date} />
+        </Section>
+      )}
 
+      {weird.length > 0 && (
       <Section title="Something weird" sub="The stuff you'll be telling people about." href="/explore?tag=weird">
         {weird.length > 0 && (
           <div className="grid gap-4 lg:grid-cols-[1.3fr_1fr]">
@@ -278,6 +302,7 @@ export default function Home() {
           </div>
         )}
       </Section>
+      )}
 
       {deals.length > 0 && (
         <Section title="Local deals" sub="Offers from local businesses, only on Pistachio Guide.">
