@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { buildAroundQuery, elementToActivity, runOverpass } from "@/lib/osm";
-import type { Activity } from "@/lib/types";
+import { buildAroundQuery, elementsToPlaces, roundCoord, runOverpass } from "@/lib/osm";
 
 export async function GET(req: Request) {
   const u = new URL(req.url);
@@ -10,21 +9,8 @@ export async function GET(req: Request) {
   if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) {
     return NextResponse.json({ error: "Send a valid lat and lng." }, { status: 400 });
   }
-  // Round so nearby searches share the cache and we stay polite to the public Overpass servers.
-  const rl = Math.round(lat * 200) / 200;
-  const rg = Math.round(lng * 200) / 200;
   try {
-    const els = await runOverpass(buildAroundQuery(rl, rg, radius));
-    const seen = new Set<string>();
-    const places: Activity[] = [];
-    for (const el of els) {
-      const a = elementToActivity(el);
-      if (!a) continue;
-      const key = `${a.name.toLowerCase()}|${a.category}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      places.push(a);
-    }
+    const places = elementsToPlaces(await runOverpass(buildAroundQuery(roundCoord(lat), roundCoord(lng), radius)));
     return NextResponse.json(
       { places, attribution: "© OpenStreetMap contributors (ODbL)" },
       { headers: { "Cache-Control": "public, s-maxage=21600, stale-while-revalidate=86400" } },

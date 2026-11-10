@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { parseOsmHours, isOpenAt } from "../src/lib/hours";
-import { elementToActivity, buildAroundQuery } from "../src/lib/osm";
+import { elementToActivity, buildAroundQuery, elementsToPlaces } from "../src/lib/osm";
+import { loadNearbyPlaces, loadPlaceById } from "../src/lib/discover";
 import { parseQuery, applyFilters, defaultFilters } from "../src/lib/search";
 import { demoActivities } from "../src/lib/demo-data";
 
@@ -55,4 +56,64 @@ for (const q of ["Something fun to do for under £15", "A weird date idea near m
   assert.ok(res.length > 0, `no results for "${q}"`);
   console.log(`${res.length.toString().padStart(2)} results  ${q}`);
 }
-console.log("all logic tests passed");
+
+// Duplicates of the same name and category collapse to one place
+const cafeEl = (id: number) => ({ type: "node" as const, id, lat: 50.85, lon: 4.35, tags: { amenity: "cafe", name: "Bean There" } });
+assert.equal(elementsToPlaces([cafeEl(1), cafeEl(2)]).length, 1);
+
+// Real places: our API route first, then straight to Overpass from the browser if that fails
+async function fallbackTests() {
+  const realFetch = globalThis.fetch;
+  const calls: { url: string; headers: Record<string, string> }[] = [];
+  const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
+  const mock = (serverReply: () => Response | Promise<Response>, overpassReply: (url: string) => Response) => {
+    calls.length = 0;
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      calls.push({ url, headers: (init?.headers ?? {}) as Record<string, string> });
+      return url.startsWith("/api/") ? serverReply() : overpassReply(url);
+    }) as typeof fetch;
+  };
+  try {
+    // Server route works: Overpass isn't contacted from the browser
+    mock(() => json({ places: [{ id: "osm-node-1" }] }), () => json({}, 500));
+    assert.equal((await loadNearbyPlaces(50.85, 4.35, 3000)).length, 1);
+    assert.equal(calls.length, 1);
+
+    // Server route fails (502, or a non-JSON timeout page): the browser asks Overpass, trying the second server if the first refuses
+    for (const serverReply of [() => json({ error: "nope", places: [] }, 502), () => new Response("<html>504</html>", { status: 504 })]) {
+      mock(serverReply, (url) => (url.includes("overpass-api.de") ? json({}, 429) : json({ elements: [cafeEl(7)] })));
+      const got = await loadNearbyPlaces(50.85, 4.35, 3000);
+      assert.equal(got[0].id, "osm-node-7");
+      assert.equal(calls.length, 3);
+    }
+
+    // Everything down: one clear message rather than a parser error
+    mock(() => new Response("<html>504</html>", { status: 504 }), () => json({}, 504));
+    await assert.rejects(loadNearbyPlaces(50.85, 4.35, 3000), /OpenStreetMap didn't respond/);
+
+    // A single place by id falls back the same way, but a definite 404 is final
+    mock(() => json({ error: "down" }, 502), () => json({ elements: [cafeEl(9)] }));
+    assert.equal((await loadPlaceById("osm-node-9")).id, "osm-node-9");
+    mock(() => json({ error: "Place not found in OpenStreetMap." }, 404), () => json({ elements: [cafeEl(9)] }));
+    await assert.rejects(loadPlaceById("osm-node-9"), /not found/);
+    assert.equal(calls.length, 1);
+
+    // In a browser no User-Agent header is set, so the Overpass request needs no CORS preflight
+    (globalThis as { window?: unknown }).window = {};
+    mock(() => json({}, 502), () => json({ elements: [] }));
+    await loadNearbyPlaces(50.85, 4.35, 3000);
+    assert.deepEqual(Object.keys(calls[1].headers), ["Content-Type"]);
+    delete (globalThis as { window?: unknown }).window;
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+}
+
+fallbackTests().then(
+  () => console.log("all logic tests passed"),
+  (e) => {
+    console.error(e);
+    process.exit(1);
+  },
+);

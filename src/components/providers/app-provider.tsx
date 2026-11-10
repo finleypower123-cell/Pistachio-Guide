@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { applyOverlay, loadOverlays, type BusinessRecord } from "@/lib/business";
 import { demoActivities } from "@/lib/demo-data";
+import { loadNearbyPlaces } from "@/lib/discover";
 import { DEFAULT_PLACE } from "@/lib/geo";
 import { defaultFilters, type Filters } from "@/lib/search";
 import { PREVIEW } from "@/lib/preview";
@@ -73,11 +74,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const ctrl = new AbortController();
     setOsmStatus("loading");
     setOsmError(null);
-    fetch(`/api/discover?lat=${place.lat}&lng=${place.lng}&radius=3000`, { signal: ctrl.signal })
-      .then(async (r) => {
-        const j = await r.json();
-        if (!r.ok) throw new Error(j.error ?? "OpenStreetMap is unavailable.");
-        setOsm(j.places as Activity[]);
+    loadNearbyPlaces(place.lat, place.lng, 3000, ctrl.signal)
+      .then((places) => {
+        if (ctrl.signal.aborted) return;
+        setOsm(places);
         setOsmStatus("ok");
       })
       .catch((e: Error) => {

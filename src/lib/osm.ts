@@ -183,25 +183,56 @@ export function elementToActivity(el: OsmElement): Activity | null {
   };
 }
 
-export async function runOverpass(query: string): Promise<OsmElement[]> {
+/** Turns raw Overpass elements into activities, dropping duplicates of the same name and category. */
+export function elementsToPlaces(els: OsmElement[]): Activity[] {
+  const seen = new Set<string>();
+  const places: Activity[] = [];
+  for (const el of els) {
+    const a = elementToActivity(el);
+    if (!a) continue;
+    const key = `${a.name.toLowerCase()}|${a.category}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    places.push(a);
+  }
+  return places;
+}
+
+/** Round so nearby searches share a cache entry and we stay polite to the public Overpass servers. */
+export const roundCoord = (n: number) => Math.round(n * 200) / 200;
+
+/**
+ * Runs a query against each Overpass endpoint in turn. Works on the server and in the browser:
+ * the public servers allow cross-origin requests, and this request needs no preflight.
+ */
+export async function runOverpass(query: string, opts: { timeoutMs?: number; signal?: AbortSignal } = {}): Promise<OsmElement[]> {
+  const headers: Record<string, string> = { "Content-Type": "application/x-www-form-urlencoded" };
+  // Browsers send their own User-Agent; setting one there would force a CORS preflight.
+  if (typeof window === "undefined")
+    headers["User-Agent"] = "PistachioGuide/0.1 (+https://github.com/finleypower123-cell/Pistachio-Guide)";
   let lastErr: unknown;
   for (const url of OVERPASS_ENDPOINTS) {
+    if (opts.signal?.aborted) break;
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), opts.timeoutMs ?? 20000);
+    const onAbort = () => ctrl.abort();
+    opts.signal?.addEventListener("abort", onAbort);
     try {
       const res = await fetch(url, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-          "User-Agent": "PistachioGuide/0.1 (+https://github.com/finleypower123-cell/Pistachio-Guide)",
-        },
+        headers,
         body: "data=" + encodeURIComponent(query),
         cache: "no-store",
-        signal: AbortSignal.timeout(20000),
+        signal: ctrl.signal,
       });
       if (!res.ok) throw new Error(`Overpass ${res.status}`);
       const json = (await res.json()) as { elements?: OsmElement[] };
       return json.elements ?? [];
     } catch (e) {
       lastErr = e;
+    } finally {
+      clearTimeout(timer);
+      opts.signal?.removeEventListener("abort", onAbort);
     }
   }
   throw lastErr instanceof Error ? lastErr : new Error("Overpass unavailable");
