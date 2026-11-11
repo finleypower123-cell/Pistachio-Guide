@@ -6,21 +6,12 @@ import { useApp } from "@/components/providers/app-provider";
 import { Sheet } from "@/components/ui/sheet";
 import { PREVIEW } from "@/lib/preview";
 import { useToast } from "@/components/ui/toast";
+import { CITIES } from "@/lib/cities";
 
 type Result = { label: string; detail: string; lat: number; lng: number };
 
 /** Quick picks, shown before typing and whenever live search is unavailable. */
-const POPULAR: Result[] = [
-  { label: "London", detail: "England", lat: 51.5145, lng: -0.0875 },
-  { label: "Manchester", detail: "England", lat: 53.4808, lng: -2.2426 },
-  { label: "Bristol", detail: "England", lat: 51.4545, lng: -2.5879 },
-  { label: "Leeds", detail: "England", lat: 53.7997, lng: -1.5492 },
-  { label: "Brighton", detail: "England", lat: 50.8225, lng: -0.1372 },
-  { label: "Glasgow", detail: "Scotland", lat: 55.8617, lng: -4.2583 },
-  { label: "Edinburgh", detail: "Scotland", lat: 55.9533, lng: -3.1883 },
-  { label: "Cardiff", detail: "Wales", lat: 51.4816, lng: -3.1791 },
-  { label: "Brussels", detail: "Belgium", lat: 50.8467, lng: 4.3525 },
-];
+const POPULAR: Result[] = CITIES;
 
 export function useGeocode(q: string) {
   const [results, setResults] = useState<Result[]>([]);
