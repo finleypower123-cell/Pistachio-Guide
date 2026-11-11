@@ -7,6 +7,7 @@ import { DiscoveryMap } from "@/components/map/discovery-map";
 import { useApp } from "@/components/providers/app-provider";
 import { useUser } from "@/components/providers/user-provider";
 import { cn } from "@/lib/utils";
+import { hasSupabase } from "@/lib/supabase/config";
 
 export default function SavedPage() {
   const { saved, recent, cloud, clearRecent } = useUser();
@@ -24,7 +25,7 @@ export default function SavedPage() {
           <h1 className="text-4xl font-extrabold md:text-5xl">Saved</h1>
           <p className="mt-1 text-ink-soft">
             {cloud ? "Synced to your account." : (
-              <>Saved on this device. <Link href="/profile" className="font-bold text-ink underline">Sign in</Link> to keep them everywhere.</>
+              hasSupabase ? <>Saved on this device. <Link href="/profile" className="font-bold text-ink underline">Sign in</Link> to keep them everywhere.</> : "Saved on this device."
             )}
           </p>
         </div>

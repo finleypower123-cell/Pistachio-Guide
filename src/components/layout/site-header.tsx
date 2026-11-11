@@ -7,6 +7,7 @@ import { useApp } from "@/components/providers/app-provider";
 import { useUser } from "@/components/providers/user-provider";
 import { Logo } from "@/components/ui/logo";
 import { cn } from "@/lib/utils";
+import { hasSupabase } from "@/lib/supabase/config";
 
 const LINKS = [
   { href: "/explore", label: "Explore" },
@@ -61,12 +62,13 @@ export function SiteHeader() {
           <Link href="/business" className="hidden items-center gap-1.5 rounded-full px-3 py-2 text-sm font-bold hover:bg-surface-2 xl:flex">
             <Store className="size-4" /> For business
           </Link>
+          {/* Without accounts connected there is nothing to sign in to, so the button offers preferences instead. */}
           <Link
             href="/profile"
             className="hidden h-10 items-center justify-center rounded-full bg-primary px-4 text-sm font-extrabold text-on-primary md:flex"
-            aria-label={displayName ? "Your profile" : "Sign in"}
+            aria-label={displayName ? "Your profile" : hasSupabase ? "Sign in" : "Your preferences"}
           >
-            {initial ? <span className="grid size-6 place-items-center">{initial}</span> : "Sign in"}
+            {initial ? <span className="grid size-6 place-items-center">{initial}</span> : hasSupabase ? "Sign in" : "You"}
           </Link>
         </div>
       </div>
