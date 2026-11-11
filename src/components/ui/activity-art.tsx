@@ -92,6 +92,7 @@ export const ActivityArt = memo(function ActivityArt({
   hero = false,
   sizes,
   className,
+  priority = false,
 }: {
   activity: Pick<Activity, "id" | "category" | "photos" | "name">;
   variant?: number;
@@ -99,6 +100,8 @@ export const ActivityArt = memo(function ActivityArt({
   hero?: boolean;
   /** How wide the box is on screen, in `sizes` syntax, so the browser picks the smallest photo that fits. */
   sizes?: string;
+  /** Load the photo ahead of others: for the first few pictures on a screen. */
+  priority?: boolean;
   className?: string;
 }) {
   const photo = activity.photos?.[variant];
@@ -116,7 +119,7 @@ export const ActivityArt = memo(function ActivityArt({
   return (
     <span className={cn("relative block h-full w-full overflow-hidden", className)}>
       {art}
-      <Photo src={photo} alt={`Photo of ${activity.name}`} hero={hero} sizes={sizes} />
+      <Photo src={photo} alt={`Photo of ${activity.name}`} hero={hero} sizes={sizes} priority={priority} />
     </span>
   );
 });

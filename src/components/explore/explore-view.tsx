@@ -332,8 +332,8 @@ export function ExploreView({ initialView = "list" }: { initialView?: "list" | "
           ) : view === "list" ? (
             <>
               <div className="stagger grid gap-3 sm:grid-cols-2 sm:gap-5 xl:grid-cols-3">
-                {results.slice(0, visible).map((a) => (
-                  <ActivityCard key={a.id} a={a} row />
+                {results.slice(0, visible).map((a, i) => (
+                  <ActivityCard key={a.id} a={a} row priority={i < 5} />
                 ))}
               </div>
               {visible < results.length && (

@@ -70,8 +70,8 @@ function Rail({ items }: { items: Activity[] }) {
   if (!items.length) return <p className="rounded-2xl bg-surface-2 p-5 text-ink-soft">Nothing here near this location yet.</p>;
   return (
     <div className="rail stagger">
-      {items.map((a) => (
-        <ActivityCard key={a.id} a={a} />
+      {items.map((a, i) => (
+        <ActivityCard key={a.id} a={a} priority={i < 2} />
       ))}
     </div>
   );

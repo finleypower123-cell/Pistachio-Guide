@@ -72,12 +72,69 @@ export const commonsThumb = (file: string, width: ThumbWidth) =>
 
 export const commonsFilePage = (file: string) => `https://commons.wikimedia.org/wiki/File:${fileSlug(file)}`;
 
+const FILE_PATH = /^(https:\/\/commons\.wikimedia\.org\/wiki\/Special:FilePath\/([^?]+))\?width=(\d+)$/;
+
 /** Responsive sources for a `commonsThumb` URL: small ones for cards, up to 960px for a hero. */
 export function thumbSrcSet(url: string, hero = false): string | undefined {
-  const m = url.match(/^(https:\/\/commons\.wikimedia\.org\/wiki\/Special:FilePath\/[^?]+)\?width=\d+$/);
+  const m = url.match(FILE_PATH);
   if (!m) return undefined;
   const widths: ThumbWidth[] = hero ? [500, 960] : [330, 500];
   return widths.map((w) => `${m[1]}?width=${w} ${w}w`).join(", ");
+}
+
+/**
+ * The image server's own address for a `commonsThumb` URL. `Special:FilePath` answers with a
+ * redirect to this address, which costs every photo an extra round trip; going straight there
+ * saves it. The folder is the first characters of the MD5 of the file name. Returns undefined for
+ * anything unusual (very long names are stored differently), and callers fall back to the
+ * redirecting address if a direct one fails.
+ */
+export function directThumb(url: string, width?: ThumbWidth): string | undefined {
+  const m = url.match(FILE_PATH);
+  if (!m) return undefined;
+  let name: string;
+  try {
+    name = decodeURIComponent(m[2]);
+  } catch {
+    return undefined;
+  }
+  const slug = encodeURIComponent(name);
+  if (!isPhotoFile(name) || slug.length > 150) return undefined;
+  const h = md5(name);
+  return `https://upload.wikimedia.org/wikipedia/commons/thumb/${h[0]}/${h.slice(0, 2)}/${slug}/${width ?? m[3]}px-${slug}`;
+}
+
+/** Direct-address version of `thumbSrcSet`. */
+export function directSrcSet(url: string, hero = false): string | undefined {
+  const widths: ThumbWidth[] = hero ? [500, 960] : [330, 500];
+  const parts = widths.map((w) => directThumb(url, w));
+  return parts.every(Boolean) ? parts.map((p, i) => `${p} ${widths[i]}w`).join(", ") : undefined;
+}
+
+/** MD5 of a string as hex. Only used to work out where Wikimedia stores a file. */
+export function md5(input: string): string {
+  const bytes = Array.from(new TextEncoder().encode(input));
+  const bitLen = bytes.length * 8;
+  bytes.push(0x80);
+  while (bytes.length % 64 !== 56) bytes.push(0);
+  for (let i = 0; i < 8; i++) bytes.push(i < 4 ? (bitLen >>> (8 * i)) & 0xff : 0);
+  const S = [7, 12, 17, 22, 5, 9, 14, 20, 4, 11, 16, 23, 6, 10, 15, 21];
+  const K = Array.from({ length: 64 }, (_, i) => Math.floor(Math.abs(Math.sin(i + 1)) * 2 ** 32) >>> 0);
+  let [a0, b0, c0, d0] = [0x67452301, 0xefcdab89, 0x98badcfe, 0x10325476];
+  for (let off = 0; off < bytes.length; off += 64) {
+    const M = Array.from({ length: 16 }, (_, i) => (bytes[off + i * 4] | (bytes[off + i * 4 + 1] << 8) | (bytes[off + i * 4 + 2] << 16) | (bytes[off + i * 4 + 3] << 24)) >>> 0);
+    let [A, B, C, D] = [a0, b0, c0, d0];
+    for (let i = 0; i < 64; i++) {
+      const r = i >> 4;
+      const F = r === 0 ? (B & C) | (~B & D) : r === 1 ? (D & B) | (~D & C) : r === 2 ? B ^ C ^ D : C ^ (B | ~D);
+      const g = r === 0 ? i : r === 1 ? (5 * i + 1) % 16 : r === 2 ? (3 * i + 5) % 16 : (7 * i) % 16;
+      const x = (A + F + K[i] + M[g]) >>> 0;
+      const s = S[r * 4 + (i % 4)];
+      [A, D, C, B] = [D, C, B, (B + ((x << s) | (x >>> (32 - s)))) >>> 0];
+    }
+    [a0, b0, c0, d0] = [(a0 + A) >>> 0, (b0 + B) >>> 0, (c0 + C) >>> 0, (d0 + D) >>> 0];
+  }
+  return [a0, b0, c0, d0].map((v) => Array.from({ length: 4 }, (_, i) => ((v >>> (8 * i)) & 0xff).toString(16).padStart(2, "0")).join("")).join("");
 }
 
 // ---- Fetching ------------------------------------------------------------------------------------
@@ -361,8 +418,15 @@ export type AreaPhotos = Record<string, { file: string }>;
  * Photos for the places of one search area, keyed by place id. A handful of requests in total,
  * however many places there are, and none at all when the area was looked up in the last week.
  */
+const areaKey = (centre: { lat: number; lng: number }, radiusKm: number) => `${centre.lat.toFixed(3)},${centre.lng.toFixed(3)},${radiusKm}`;
+
+/** Photos already found for this area on this device, available at once without any request. */
+export function cachedAreaPhotos(centre: { lat: number; lng: number }, radiusKm: number): AreaPhotos | undefined {
+  return cacheGet<AreaPhotos>(AREA_STORE, areaKey(centre, radiusKm), 7 * DAY_MS);
+}
+
 export async function loadAreaPhotos(places: Activity[], centre: { lat: number; lng: number }, radiusKm: number, signal?: AbortSignal): Promise<AreaPhotos> {
-  const key = `${centre.lat.toFixed(3)},${centre.lng.toFixed(3)},${radiusKm}`;
+  const key = areaKey(centre, radiusKm);
   const cached = cacheGet<AreaPhotos>(AREA_STORE, key, 7 * DAY_MS);
   if (cached) return cached;
 

@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+import { directThumb, md5 } from "../src/lib/wiki";
 import assert from "node:assert/strict";
 import { parseOsmHours, isOpenAt } from "../src/lib/hours";
 import { elementToActivity, buildAroundQuery, elementsToPlaces } from "../src/lib/osm";
@@ -186,6 +188,20 @@ assert.equal(photonToElement({ properties: { osm_id: 1, osm_type: "N", osm_key: 
   assert.equal(order[0], "M2");
 }
 
+// ---- photos fetched straight from the image server ----
+{
+  assert.equal(md5(""), "d41d8cd98f00b204e9800998ecf8427e");
+  assert.equal(md5("The quick brown fox jumps over the lazy dog"), createHash("md5").update("The quick brown fox jumps over the lazy dog").digest("hex"));
+  assert.equal(md5("Musée_é.jpg"), createHash("md5").update("Musée_é.jpg").digest("hex"), "non-ASCII names hash as UTF-8");
+  assert.equal(md5("x".repeat(200)), createHash("md5").update("x".repeat(200)).digest("hex"), "more than one block");
+  const viaRedirect = commonsThumb("Example.jpg", 330);
+  assert.equal(directThumb(viaRedirect), "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a9/Example.jpg/330px-Example.jpg");
+  assert.equal(directThumb(viaRedirect, 960), "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a9/Example.jpg/960px-Example.jpg");
+  assert.equal(directThumb(commonsThumb("Tour Eiffel (été).jpg", 500))!.split("/thumb/")[1].split("/").slice(2).join("/"), "Tour_Eiffel_(%C3%A9t%C3%A9).jpg/500px-Tour_Eiffel_(%C3%A9t%C3%A9).jpg");
+  assert.equal(directThumb(commonsThumb("x".repeat(170) + ".jpg", 330)), undefined, "very long names keep the redirecting address");
+  assert.equal(directThumb("https://example.org/a.jpg"), undefined);
+}
+
 // ---- friendly descriptions ----
 {
   const cafe = elementToActivity({ type: "node", id: 42, lat: 1, lon: 1, tags: { amenity: "cafe", name: "Bean There" } })!;
@@ -271,6 +287,33 @@ async function fallbackTests() {
     mock(() => new Response("<html>504</html>", { status: 504 }), () => json({}, 504));
     await assert.rejects(loadNearbyPlaces(50.85, 4.35, 3000), /Couldn't load real places/);
     assert.equal(photonCalls(), 2);
+
+    // Saved results: recent ones are the answer; older ones show at once and are refreshed behind
+    {
+      const store = new Map<string, string>();
+      (globalThis as { localStorage?: unknown }).localStorage = { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => void store.set(k, v) };
+      mock(() => json({ places: [{ id: "osm-node-1" }] }), cafesOnly);
+      await loadNearbyPlaces(50.85, 4.35, 3000);
+      assert.equal(calls.length, 1);
+      await loadNearbyPlaces(50.85, 4.35, 3000);
+      assert.equal(calls.length, 1, "a recent saved result needs no request");
+      // age the saved entry by two days
+      const key = [...store.keys()][0];
+      const aged = JSON.parse(store.get(key)!);
+      aged[0].at -= 2 * 86_400_000;
+      store.set(key, JSON.stringify(aged));
+      mock(() => json({ places: [{ id: "osm-node-2" }] }), cafesOnly);
+      const shown: string[] = [];
+      const refreshed = await loadNearbyPlaces(50.85, 4.35, 3000, undefined, { onProgress: (p) => shown.push(p[0].id) });
+      assert.deepEqual(shown, ["osm-node-1"], "the older result is shown straight away");
+      assert.equal(refreshed[0].id, "osm-node-2", "then replaced by the fresh one");
+      // if the refresh fails, the older result stays
+      aged[0].places = [{ id: "osm-node-2" }];
+      store.set(key, JSON.stringify(aged));
+      mock(() => new Response("<html>504</html>", { status: 504 }), () => json({}, 504));
+      assert.equal((await loadNearbyPlaces(50.85, 4.35, 3000))[0].id, "osm-node-2");
+      delete (globalThis as { localStorage?: unknown }).localStorage;
+    }
 
     // A single place falls back to the OpenStreetMap API: nodes directly, ways centred on their points
     mock(() => json({ error: "down" }, 502), () => json({ elements: [{ type: "node", id: 9, lat: 50.85, lon: 4.35, tags: { amenity: "cafe", name: "Bean There", opening_hours: "Mo-Su 08:00-17:00" } }] }));

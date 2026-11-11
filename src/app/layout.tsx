@@ -38,6 +38,11 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en-GB">
+      <head>
+        {/* Open the connection to the photo server early, so the first photos start sooner. */}
+        <link rel="preconnect" href="https://upload.wikimedia.org" />
+        <link rel="dns-prefetch" href="https://commons.wikimedia.org" />
+      </head>
       <body className="min-h-dvh antialiased">
         <ToastProvider>
           <UserProvider>
