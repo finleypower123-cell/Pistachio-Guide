@@ -380,6 +380,8 @@ function parseExact(q: string): Parsed {
     understood.push("Up to 2 hours");
   }
   for (const [re, ids] of CAT_WORDS) if (re.test(s)) ids.forEach((c) => cats.add(c));
+  // "theme park", "water park" and "trampoline park" are their own thing, not a request for parks and gardens.
+  if ((cats.has("themepark") || cats.has("water") || cats.has("trampoline")) && !/\bparks?\b.*\bparks?\b/.test(s)) cats.delete("park");
   // "a quirky café" means an interesting independent one, not a literally weird attraction
   if (cats.size && tags.has("weird") && !/\bweird\b/.test(s)) {
     tags.delete("weird");

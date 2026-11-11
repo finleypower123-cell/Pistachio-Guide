@@ -118,6 +118,21 @@ export default function ActivityPage() {
     return () => ctrl.abort();
   }, [wikiKey]);
 
+  // The tab carries the place's own name. The framework writes the generic page title into the
+  // head after this page renders, so the name is put back whenever the head changes.
+  const placeName = a?.name;
+  useEffect(() => {
+    if (!placeName) return;
+    const want = `${placeName} · Pistachio Guide`;
+    const apply = () => {
+      if (document.title !== want) document.title = want;
+    };
+    apply();
+    const watcher = new MutationObserver(apply);
+    watcher.observe(document.head, { childList: true, subtree: true, characterData: true });
+    return () => watcher.disconnect();
+  }, [placeName]);
+
   useEffect(() => {
     if (!a || logged.current === a.id) return;
     logged.current = a.id;
@@ -205,8 +220,6 @@ export default function ActivityPage() {
 
   return (
     <div className="gutter mx-auto max-w-7xl pb-10 pt-4 md:pt-8">
-      {/* React moves this into the page head, so the tab carries the place's own name. */}
-      <title>{`${a.name} · Pistachio Guide`}</title>
       <nav className="mb-4 text-sm font-semibold text-ink-soft" aria-label="Breadcrumb">
         <Link href="/explore" className="hover:underline">Explore</Link> /{" "}
         <Link href={`/explore?cat=${a.category}`} className="hover:underline">{CAT[a.category].label}</Link>

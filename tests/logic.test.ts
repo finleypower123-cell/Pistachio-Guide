@@ -175,6 +175,8 @@ assert.equal(photonToElement({ properties: { osm_id: 1, osm_type: "N", osm_key: 
   assert.deepEqual(parseQuery("a castle to visit").filters.categories, ["historic"]);
   assert.deepEqual(parseQuery("karaoke with friends").filters.categories, ["karaoke"]);
   assert.deepEqual(parseQuery("zoo").filters.categories, ["zoo"]);
+  assert.deepEqual(parseQuery("theme park").filters.categories, ["themepark"], "not parks and gardens as well");
+  assert.deepEqual(parseQuery("a park for a picnic").filters.categories, ["park"]);
 }
 
 // ---- friendly descriptions ----
