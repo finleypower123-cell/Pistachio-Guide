@@ -11,6 +11,7 @@ import { SourceBadge } from "@/components/ui/badges";
 import { Sheet } from "@/components/ui/sheet";
 import { CAT } from "@/lib/categories";
 import { distanceKm, formatWalk } from "@/lib/geo";
+import { SHOW_DEMO } from "@/lib/preview";
 import { surprisePick } from "@/lib/search";
 import type { Activity } from "@/lib/types";
 import { priceLabel } from "@/lib/utils";
@@ -71,12 +72,13 @@ export function SurpriseDialog() {
             </div>
             <div className="mt-4 flex items-center gap-2">
               <span className="text-xs font-extrabold uppercase tracking-wider text-ink-soft">{pick.typeLabel ?? CAT[pick.category].short}</span>
-              <SourceBadge a={pick} />
+              {(SHOW_DEMO || pick.source === "business") && <SourceBadge a={pick} />}
             </div>
             <h3 className="mt-1 text-3xl font-bold">{pick.name}</h3>
             <p className="mt-2 text-ink-soft">{pick.summary}</p>
             <p className="mt-3 text-sm font-bold tabular">
-              {priceLabel(pick.price)} · {formatWalk(distanceKm(place, pick))}
+              {pick.price != null ? `${priceLabel(pick.price)} · ` : ""}
+              {formatWalk(distanceKm(place, pick))}
             </p>
             <p className="mt-3 text-xs text-ink-soft">Picked for: {reasons.join(", ")}.</p>
             <div className="mt-5 grid grid-cols-2 gap-2">

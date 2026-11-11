@@ -1,3 +1,4 @@
+import { blurbFor } from "./blurbs";
 import { CAT } from "./categories";
 import { distanceKm } from "./geo";
 import { isOpenAt, nowHour } from "./hours";
@@ -85,7 +86,9 @@ const typosAllowed = (w: string) => (w.length >= 8 ? 2 : w.length >= 5 ? 1 : 0);
 
 /** Free-text match on name, type and address: every word must appear, allowing accents and small typos. */
 export function matchesText(a: Activity, text: string) {
-  const hay = plain(`${a.name} ${a.summary} ${CAT[a.category].label} ${a.typeLabel ?? ""} ${a.address ?? ""}`);
+  // The stock line written for a kind of place isn't about this venue, so it isn't searched.
+  const ownWords = a.summary === blurbFor(a.typeLabel ?? "", a.id) ? "" : a.summary;
+  const hay = plain(`${a.name} ${ownWords} ${CAT[a.category].label} ${a.typeLabel ?? ""} ${a.address ?? ""}`);
   const hayWords = hay.split(/[^a-z0-9]+/).filter(Boolean);
   return plain(text)
     .split(/\s+/)
