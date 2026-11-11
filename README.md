@@ -87,6 +87,10 @@ tests/logic.test.ts    unit tests
 
 Map components from [mapcn](https://github.com/AnmolSaini16/mapcn), Supabase helpers from [nextjs-supabase-shadcn-boilerplate](https://github.com/Barty-Bart/nextjs-supabase-shadcn-boilerplate), OSM category mapping from [TRIP](https://github.com/itskovacs/TRIP), tile setup informed by [nextjs-maplibre-starter](https://github.com/wellywahyudi/nextjs-maplibre-starter). All MIT; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Map data © OpenStreetMap contributors. Photos from Wikimedia Commons under each file's own licence, and descriptions from Wikipedia under CC BY-SA 4.0, each credited where shown.
 
+## Photos
+
+Real photos come from Wikimedia Commons where a place has one (about one place in ten), and from venues' own uploads once accounts are connected. Everything else shows an illustration. The options for covering cafés and small venues, with their costs and rules, are in [`docs/photo-sources.md`](docs/photo-sources.md).
+
 ## Launch settings
 
 - `NEXT_PUBLIC_SITE_URL`: the site's public address (for example `https://pistachio.guide`), used in share previews, `robots.txt` and `sitemap.xml`. On Vercel the production address is used automatically until this is set; set it once the site has its own domain.
