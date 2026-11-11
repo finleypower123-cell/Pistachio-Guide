@@ -212,7 +212,6 @@ const KIND: Partial<Record<CategoryId, RegExp>> = {
   boats: /boat|marina|lake|canal|rowing/i,
   historic: /castle|palace|ruin|fort|abbey|church|tower|manor|ch[aâ]teau|house|monument|heritage|remains|wall|temple|priory|chapel|building|site|gate/i,
   brewery: /brew|beer|distill|pub\b/i,
-  walk: /nature|reserve|park|wood|forest|marsh|wetland|viewpoint|hill|trail|heath|meadow|garden|building|landmark|tower|monument|attraction|observat/i,
 };
 
 /** Parks, zoos, theme parks and reserves are large and mapped by their centre, so their coordinates can sit far apart. */
