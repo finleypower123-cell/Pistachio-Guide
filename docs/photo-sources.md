@@ -16,7 +16,7 @@ Cafés, small shops, escape rooms and most independent venues have no photo on W
 
 ### 1. Owners upload their own (recommended first)
 
-Already built. It needs Supabase connected (see the README, "Accounts and business portal"). The photos are the venue's own, so there is no licence cost and no risk of showing the wrong place. This is also the feature the business plan charges for.
+Already built. It needs Supabase connected (see the README, "Turn on accounts (Supabase)"). The photos are the venue's own, so there is no licence cost and no risk of showing the wrong place. This is also the feature the business plan charges for.
 
 ### 2. Google Places API (New), Place Photos
 
