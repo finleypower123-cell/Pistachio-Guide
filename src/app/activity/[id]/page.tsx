@@ -118,19 +118,11 @@ export default function ActivityPage() {
     return () => ctrl.abort();
   }, [wikiKey]);
 
-  // The tab carries the place's own name. The framework writes the generic page title into the
-  // head after this page renders, so the name is put back whenever the head changes.
+  // The server sets the place's name as the tab title (see layout.tsx). This covers the cases it
+  // can't: a lookup that failed, or a place that isn't from OpenStreetMap.
   const placeName = a?.name;
   useEffect(() => {
-    if (!placeName) return;
-    const want = `${placeName} · Pistachio Guide`;
-    const apply = () => {
-      if (document.title !== want) document.title = want;
-    };
-    apply();
-    const watcher = new MutationObserver(apply);
-    watcher.observe(document.head, { childList: true, subtree: true, characterData: true });
-    return () => watcher.disconnect();
+    if (placeName && document.title.startsWith("Place ·")) document.title = `${placeName} · Pistachio Guide`;
   }, [placeName]);
 
   useEffect(() => {
