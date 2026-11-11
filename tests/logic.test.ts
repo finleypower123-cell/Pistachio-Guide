@@ -315,6 +315,33 @@ async function fallbackTests() {
       delete (globalThis as { localStorage?: unknown }).localStorage;
     }
 
+    // A ready-made city file: the answer at the city's own centre, a first screen nearby
+    {
+      const store = new Map<string, string>();
+      (globalThis as { localStorage?: unknown }).localStorage = { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => void store.set(k, v) };
+      (globalThis as { window?: unknown }).window = {};
+      const file = { builtAt: new Date().toISOString(), centre: { lat: 50.8467, lng: 4.3525 }, radiusKm: 5, places: [{ id: "osm-node-55" }], photos: { "osm-node-55": { file: "X.jpg" } } };
+      const withFile = (url: string) => (url.includes("/data/cities/brussels.json") ? json(file) : cafesOnly(url));
+      mock(() => json({ places: [{ id: "osm-node-1" }] }), withFile);
+      assert.equal((await loadNearbyPlaces(50.8467, 4.3525, 5000))[0].id, "osm-node-55");
+      assert.deepEqual(calls, ["/data/cities/brussels.json"], "at the centre nothing else is asked");
+      assert.ok([...store.values()].some((v) => v.includes("X.jpg")), "its photo matches are kept for the photo lookup");
+      store.clear();
+      const seen: string[] = [];
+      const near = await loadNearbyPlaces(50.856, 4.3525, 5000, undefined, { onProgress: (p) => seen.push(p[0].id) });
+      assert.equal(seen[0], "osm-node-55", "a kilometre away the file fills the screen first");
+      assert.equal(near[0].id, "osm-node-1", "then the lookup for the exact spot replaces it");
+      store.clear();
+      mock(() => json({ places: [{ id: "osm-node-1" }] }), withFile);
+      await loadNearbyPlaces(48.85, 2.35, 5000);
+      assert.ok(!calls.some((u) => u.includes("/data/cities/")), "far from any listed city no file is fetched");
+      store.clear();
+      mock(() => json({ places: [{ id: "osm-node-1" }] }), (url) => (url.includes("/data/cities/") ? json({ ...file, builtAt: "2020-01-01T00:00:00Z" }) : cafesOnly(url)));
+      assert.equal((await loadNearbyPlaces(50.8467, 4.3525, 5000))[0].id, "osm-node-1", "a long-out-of-date file is ignored");
+      delete (globalThis as { window?: unknown }).window;
+      delete (globalThis as { localStorage?: unknown }).localStorage;
+    }
+
     // A single place falls back to the OpenStreetMap API: nodes directly, ways centred on their points
     mock(() => json({ error: "down" }, 502), () => json({ elements: [{ type: "node", id: 9, lat: 50.85, lon: 4.35, tags: { amenity: "cafe", name: "Bean There", opening_hours: "Mo-Su 08:00-17:00" } }] }));
     const full = await loadPlaceById("osm-node-9");

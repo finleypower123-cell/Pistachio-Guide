@@ -1,4 +1,7 @@
+import { CITIES, CITY_DATA_RADIUS_KM, type City, type CityData } from "./cities";
+import { distanceKm } from "./geo";
 import { osmApiPlace, photonNearby } from "./places-fallback";
+import { seedAreaPhotos } from "./wiki";
 import { roundCoord } from "./osm";
 import type { Activity } from "./types";
 
@@ -75,6 +78,47 @@ function writeCache(key: string, places: Activity[], full: boolean) {
   }
 }
 
+// ---- ready-made city files -------------------------------------------------------------------
+
+/** City files older than this are ignored: the weekly rebuild has clearly stopped. */
+const CITY_DATA_MAX_AGE_MS = 45 * 86_400_000;
+
+async function readyMade(lat: number, lng: number, radiusM: number, signal?: AbortSignal): Promise<{ places: Activity[]; exact: boolean } | null> {
+  if (typeof window === "undefined" || radiusM !== CITY_DATA_RADIUS_KM * 1000) return null;
+  let city: City | undefined;
+  let km = Infinity;
+  for (const c of CITIES) {
+    const d = distanceKm({ lat, lng }, c);
+    if (d < km) {
+      km = d;
+      city = c;
+    }
+  }
+  // Beyond about 2.5 km the city file covers too little of what is around the visitor.
+  if (!city || km > 2.5) return null;
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 4000);
+    const onAbort = () => ctrl.abort();
+    signal?.addEventListener("abort", onAbort);
+    let data: CityData;
+    try {
+      const r = await fetch(`/data/cities/${city.slug}.json`, { signal: ctrl.signal });
+      if (!r.ok) return null;
+      data = (await r.json()) as CityData;
+    } finally {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", onAbort);
+    }
+    if (!data.places?.length || Date.now() - Date.parse(data.builtAt) > CITY_DATA_MAX_AGE_MS) return null;
+    const exact = km < 0.3;
+    if (exact) seedAreaPhotos({ lat, lng }, CITY_DATA_RADIUS_KM, data.photos ?? {});
+    return { places: data.places, exact };
+  } catch {
+    return null;
+  }
+}
+
 // ---- loaders ---------------------------------------------------------------------------------
 
 type Loaded = { places: Activity[]; full: boolean };
@@ -93,6 +137,24 @@ export async function loadNearbyPlaces(
   // stay on screen while a fresh set loads behind them, and remain if that load fails.
   const saved = opts.fresh ? null : readCache(key);
   if (saved?.fresh) return saved.places;
+  if (!saved && !opts.fresh) {
+    // No saved results, but a ready-made city file may cover this spot. At the city's own centre
+    // it is the answer; nearby, it fills the screen while the lookup for the exact spot runs.
+    const ready = await readyMade(lat, lng, radiusM, signal);
+    if (ready?.exact) {
+      writeCache(key, ready.places, false);
+      return ready.places;
+    }
+    if (ready) {
+      opts.onProgress?.(ready.places);
+      try {
+        return await loadNearbyPlaces(lat, lng, radiusM, signal, { fresh: true });
+      } catch (e) {
+        if (signal?.aborted) throw e;
+        return ready.places;
+      }
+    }
+  }
   if (saved) {
     opts.onProgress?.(saved.places);
     try {

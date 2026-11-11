@@ -145,7 +145,9 @@ async function getJson<T>(url: string, signal?: AbortSignal, timeoutMs = 8000): 
   const onAbort = () => ctrl.abort();
   signal?.addEventListener("abort", onAbort);
   try {
-    const res = await fetch(url, { signal: ctrl.signal });
+    // Outside a browser (the weekly city-data build) Wikimedia asks callers to identify themselves.
+    const headers = typeof window === "undefined" ? { "User-Agent": "PistachioGuide/0.1 (+https://github.com/finleypower123-cell/Pistachio-Guide)" } : undefined;
+    const res = await fetch(url, { signal: ctrl.signal, headers });
     if (!res.ok) throw new Error(`${new URL(url).hostname} ${res.status}`);
     return (await res.json()) as T;
   } finally {
@@ -423,6 +425,11 @@ const areaKey = (centre: { lat: number; lng: number }, radiusKm: number) => `${c
 /** Photos already found for this area on this device, available at once without any request. */
 export function cachedAreaPhotos(centre: { lat: number; lng: number }, radiusKm: number): AreaPhotos | undefined {
   return cacheGet<AreaPhotos>(AREA_STORE, areaKey(centre, radiusKm), 7 * DAY_MS);
+}
+
+/** Stores photos that arrived another way (a ready-made city file), so they aren't looked up again. */
+export function seedAreaPhotos(centre: { lat: number; lng: number }, radiusKm: number, photos: AreaPhotos) {
+  cacheSet(AREA_STORE, areaKey(centre, radiusKm), photos, 3);
 }
 
 export async function loadAreaPhotos(places: Activity[], centre: { lat: number; lng: number }, radiusKm: number, signal?: AbortSignal): Promise<AreaPhotos> {
