@@ -2,7 +2,8 @@ import type { CategoryId, Tag } from "./types";
 
 export type IconKey =
   | "key" | "slide" | "cup" | "dice" | "joy" | "pin" | "holds" | "tramp" | "flag" | "film"
-  | "awning" | "hanger" | "jar" | "brush" | "feet" | "tree" | "waves" | "gym" | "vase" | "bowl" | "mic";
+  | "awning" | "hanger" | "jar" | "brush" | "feet" | "tree" | "waves" | "gym" | "vase" | "bowl" | "mic"
+  | "paw" | "coaster" | "skate" | "blocks" | "boat" | "castle" | "pint";
 
 export interface Category {
   id: CategoryId;
@@ -36,6 +37,14 @@ export const CATEGORIES: Category[] = [
   { id: "workshop", label: "Workshops", short: "Workshop", icon: "vase", indoorDefault: true },
   { id: "food", label: "Food experiences", short: "Food", icon: "bowl", indoorDefault: true },
   { id: "live", label: "Live entertainment", short: "Live", icon: "mic", indoorDefault: true },
+  { id: "zoo", label: "Zoos & aquariums", short: "Animals", icon: "paw", indoorDefault: null },
+  { id: "themepark", label: "Theme parks", short: "Theme park", icon: "coaster", indoorDefault: false },
+  { id: "icerink", label: "Ice rinks", short: "Ice rink", icon: "skate", indoorDefault: null },
+  { id: "karaoke", label: "Karaoke", short: "Karaoke", icon: "mic", indoorDefault: true },
+  { id: "softplay", label: "Indoor play", short: "Indoor play", icon: "blocks", indoorDefault: true },
+  { id: "boats", label: "Boat hire", short: "Boat hire", icon: "boat", indoorDefault: false },
+  { id: "historic", label: "Castles & ruins", short: "Historic", icon: "castle", indoorDefault: false },
+  { id: "brewery", label: "Breweries", short: "Brewery", icon: "pint", indoorDefault: true },
 ];
 
 export const CAT: Record<CategoryId, Category> = Object.fromEntries(

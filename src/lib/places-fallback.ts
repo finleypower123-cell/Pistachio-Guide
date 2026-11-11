@@ -21,6 +21,7 @@ const OSM_API = "https://api.openstreetmap.org/api/0.6";
  */
 export const PHOTON_GROUPS: string[][] = [
   ["leisure:escape_game", "leisure:amusement_arcade", "leisure:bowling_alley", "leisure:miniature_golf", "leisure:trampoline_park", "leisure:water_park"],
+  ["tourism:zoo", "tourism:aquarium", "tourism:theme_park", "leisure:ice_rink", "amenity:planetarium", "amenity:karaoke_box", "leisure:indoor_play", "amenity:boat_rental"],
   ["tourism:museum"],
   ["amenity:cafe"],
   ["leisure:park"],
@@ -30,6 +31,8 @@ export const PHOTON_GROUPS: string[][] = [
   ["leisure:sports_centre", "leisure:swimming_pool"],
   ["leisure:garden"],
   ["shop:second_hand", "shop:charity", "shop:games"],
+  ["historic:castle", "historic:ruins", "craft:brewery"],
+  ["leisure:nature_reserve", "amenity:music_venue"],
 ];
 
 const serverHeaders = (): Record<string, string> => (typeof window === "undefined" ? { "User-Agent": APP_USER_AGENT } : {});

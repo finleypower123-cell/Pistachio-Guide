@@ -150,6 +150,33 @@ assert.equal(photonToElement({ properties: { osm_id: 1, osm_type: "N", osm_key: 
   assert.equal(applyFilters([shop, esc], defaultFilters(), c0)[0].name, "Locked");
 }
 
+// ---- the newer kinds of place ----
+{
+  const el = (tags: Record<string, string>) => elementToActivity({ type: "node", id: 90, lat: 1, lon: 1, tags: { name: "X", ...tags } })!;
+  const kinds: [Record<string, string>, string, string][] = [
+    [{ tourism: "zoo" }, "zoo", "Zoo"], [{ tourism: "aquarium" }, "zoo", "Aquarium"], [{ tourism: "theme_park" }, "themepark", "Theme park"],
+    [{ leisure: "ice_rink" }, "icerink", "Ice rink"], [{ amenity: "planetarium" }, "museum", "Planetarium"], [{ amenity: "karaoke_box" }, "karaoke", "Karaoke"],
+    [{ leisure: "indoor_play" }, "softplay", "Indoor play centre"], [{ amenity: "boat_rental" }, "boats", "Boat hire"], [{ historic: "castle" }, "historic", "Castle"],
+    [{ historic: "ruins" }, "historic", "Ruins"], [{ craft: "brewery" }, "brewery", "Brewery"], [{ leisure: "nature_reserve" }, "walk", "Nature reserve"],
+    [{ amenity: "music_venue" }, "live", "Music venue"],
+  ];
+  for (const [tags, category, label] of kinds) {
+    const a = el(tags);
+    assert.equal(a.category, category, JSON.stringify(tags));
+    assert.equal(a.typeLabel, label);
+    assert.ok(blurbFor(label, a.id), `a line of copy exists for ${label}`);
+    // every kind the fallback asks for is one the mapping understands
+  }
+  for (const tag of PHOTON_GROUPS.flat()) {
+    const [k, v] = tag.split(":");
+    assert.ok(el({ [k]: v }), `Photon tag ${tag} maps to a kind of place`);
+  }
+  assert.deepEqual(parseQuery("ice skating").filters.categories, ["icerink"]);
+  assert.deepEqual(parseQuery("a castle to visit").filters.categories, ["historic"]);
+  assert.deepEqual(parseQuery("karaoke with friends").filters.categories, ["karaoke"]);
+  assert.deepEqual(parseQuery("zoo").filters.categories, ["zoo"]);
+}
+
 // ---- friendly descriptions ----
 {
   const cafe = elementToActivity({ type: "node", id: 42, lat: 1, lon: 1, tags: { amenity: "cafe", name: "Bean There" } })!;
