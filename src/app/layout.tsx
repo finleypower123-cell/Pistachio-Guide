@@ -46,7 +46,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 Skip to content
               </a>
               <SiteHeader />
-              <main id="main">{children}</main>
+              {/* At least a screen tall, so the footer never shows first and then jumps down as content loads. */}
+              <main id="main" className="min-h-[100svh]">{children}</main>
               <SiteFooter />
               <BottomNav />
               <LocationDialog />
