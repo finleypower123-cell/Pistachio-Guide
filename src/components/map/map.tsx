@@ -48,7 +48,8 @@ function loadMapLibre() {
   return maplibrePromise;
 }
 
-if (typeof window !== "undefined") loadMapLibre().catch(() => {});
+// The library (about 280 KB compressed) is fetched when a map is first shown, not when this file
+// loads: pages that link to a map page would otherwise download it without ever drawing a map.
 
 const defaultStyles = {
   dark: "https://tiles.openfreemap.org/styles/dark",

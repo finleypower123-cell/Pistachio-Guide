@@ -183,6 +183,8 @@ export function score(a: Activity, center: Place, weather?: Weather | null) {
   if (hasTag(a, "weird")) s += 0.3;
   if (weather?.isWet) s += a.indoor ? 1.2 : a.indoor === false ? -1.5 : 0;
   if (a.source === "osm" && a.category === "chaincafe") s -= 0.8;
+  // A place we can actually show is a better first impression than an illustration.
+  if (a.photos?.length) s += 0.5;
   // Gyms, sports clubs and shops are useful to find but aren't what people open a fun-things guide for.
   if (a.source === "osm" && (a.typeLabel === "Leisure centre" || a.typeLabel === "Games shop")) s -= 0.6;
   return s;
