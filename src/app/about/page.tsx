@@ -22,6 +22,12 @@ export default function AboutPage() {
           <h2 className="text-2xl font-extrabold">Credits</h2>
           <ul className="mt-2 list-disc space-y-1 pl-5">
             <li>Place data © <a className="underline" href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>, ODbL. Loaded through the Overpass API, Photon and the OpenStreetMap API.</li>
+            <li>
+              Photos from <a className="underline" href="https://commons.wikimedia.org/">Wikimedia Commons</a> and descriptions from{" "}
+              <a className="underline" href="https://www.wikipedia.org/">Wikipedia</a>, found through <a className="underline" href="https://www.wikidata.org/">Wikidata</a>.
+              Each photo links to its own page, which names the photographer and licence. Wikipedia text is used under{" "}
+              <a className="underline" href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>. A place only gets a photo when we are confident it shows that place; the rest keep an illustration.
+            </li>
             <li>Location search by Nominatim (OpenStreetMap).</li>
             <li>Map tiles by OpenFreeMap, rendered with MapLibre GL JS.</li>
             <li>Weather by Open-Meteo.</li>

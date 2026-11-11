@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { useApp } from "@/components/providers/app-provider";
 import { useUser } from "@/components/providers/user-provider";
 import { ActivityArt } from "@/components/ui/activity-art";
+import { PhotoCreditMark } from "@/components/ui/photo";
 import { PistachioMark } from "@/components/ui/logo";
 import { SourceBadge } from "@/components/ui/badges";
 import { Sheet } from "@/components/ui/sheet";
@@ -67,7 +68,8 @@ export function SurpriseDialog() {
         pick && (
           <div className="animate-pop">
             <div className="relative aspect-[16/10] overflow-hidden rounded-3xl">
-              <ActivityArt activity={pick} />
+              <ActivityArt activity={pick} sizes="(max-width: 640px) 92vw, 480px" />
+              {pick.photoCredits?.[0] && <PhotoCreditMark credit={pick.photoCredits[0]} className="absolute bottom-2 right-2" />}
               <SaveButton a={pick} className="absolute right-3 top-3" />
             </div>
             <div className="mt-4 flex items-center gap-2">

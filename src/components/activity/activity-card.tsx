@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Star } from "lucide-react";
 import { useApp } from "@/components/providers/app-provider";
 import { ActivityArt } from "@/components/ui/activity-art";
+import { PhotoCreditMark } from "@/components/ui/photo";
 import { DealBadge, PriceBadge, SourceBadge, SponsoredBadge } from "@/components/ui/badges";
 import { CAT } from "@/lib/categories";
 import { distanceKm, formatDistance } from "@/lib/geo";
@@ -25,7 +26,8 @@ export function ActivityCard({ a, className, compact = false, row = false }: { a
     <article className={cn("group relative flex overflow-hidden rounded-[22px] bg-surface shadow-card transition hover:-translate-y-0.5", row ? "flex-row sm:flex-col" : "flex-col", className)}>
       <Link href={`/activity/${a.id}`} className="absolute inset-0 z-[1]" aria-label={a.name} />
       <div className={cn("relative overflow-hidden", row ? "w-28 shrink-0 self-stretch sm:aspect-[4/3] sm:w-auto" : compact ? "aspect-[16/10]" : "aspect-[4/3]")}>
-        <ActivityArt activity={a} className="transition duration-500 group-hover:scale-[1.03]" />
+        <ActivityArt activity={a} sizes={row ? "(max-width: 640px) 112px, 420px" : "320px"} className="transition duration-500 group-hover:scale-[1.03]" />
+        {a.photoCredits?.[0] && <PhotoCreditMark credit={a.photoCredits[0]} className="absolute bottom-1.5 right-1.5 z-[2]" />}
         <div className={cn("absolute flex flex-wrap gap-1.5", row ? "left-2 top-2 sm:left-3 sm:top-3" : "left-3 top-3")}>
           <PriceBadge a={a} />
           {a.sponsored && <SponsoredBadge />}

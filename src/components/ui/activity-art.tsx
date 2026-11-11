@@ -2,9 +2,10 @@ import { memo } from "react";
 import { CAT, type IconKey } from "@/lib/categories";
 import type { Activity, CategoryId } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { Photo } from "./photo";
 
 /**
- * Category illustrations used until a venue uploads real photos.
+ * Category illustrations, shown when a place has no real photo and behind one while it loads.
  * Generated SVG (no external images), seeded per listing so each card looks distinct.
  */
 
@@ -81,22 +82,34 @@ export function artSvg(category: CategoryId, seed: string) {
 export const ActivityArt = memo(function ActivityArt({
   activity,
   variant = 0,
+  hero = false,
+  sizes,
   className,
 }: {
   activity: Pick<Activity, "id" | "category" | "photos" | "name">;
   variant?: number;
+  /** A large picture (the place page's main photo): allows the bigger image size. */
+  hero?: boolean;
+  /** How wide the box is on screen, in `sizes` syntax, so the browser picks the smallest photo that fits. */
+  sizes?: string;
   className?: string;
 }) {
   const photo = activity.photos?.[variant];
-  if (photo)
-    // eslint-disable-next-line @next/next/no-img-element
-    return <img src={photo} alt={`Photo of ${activity.name}`} className={cn("h-full w-full object-cover", className)} loading="lazy" />;
-  return (
+  const art = (
     <span
-      className={cn("block h-full w-full [&>svg]:block", className)}
+      className={cn("block h-full w-full [&>svg]:block", !photo && className)}
       role="img"
       aria-label={`${CAT[activity.category].short} illustration`}
-      dangerouslySetInnerHTML={{ __html: artSvg(activity.category, `${activity.id}:${variant}`) }}
+      aria-hidden={photo ? true : undefined}
+      dangerouslySetInnerHTML={{ __html: artSvg(activity.category, `${activity.id}:${photo ? 0 : variant}`) }}
     />
+  );
+  if (!photo) return art;
+  // The illustration stays underneath as the placeholder while the photo loads, or if it never does.
+  return (
+    <span className={cn("relative block h-full w-full overflow-hidden", className)}>
+      {art}
+      <Photo src={photo} alt={`Photo of ${activity.name}`} hero={hero} sizes={sizes} />
+    </span>
   );
 });
