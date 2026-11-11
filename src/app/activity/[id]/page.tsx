@@ -15,7 +15,7 @@ import { Sheet } from "@/components/ui/sheet";
 import { useToast } from "@/components/ui/toast";
 import { bookingLink } from "@/lib/affiliate";
 import { logEvent } from "@/lib/analytics";
-import { PREVIEW } from "@/lib/preview";
+import { PREVIEW, SHOW_DEMO } from "@/lib/preview";
 import { CAT, TAG_LABEL } from "@/lib/categories";
 import { sampleReviews } from "@/lib/demo-data";
 import { loadPlaceById } from "@/lib/discover";
@@ -118,6 +118,12 @@ export default function ActivityPage() {
     return () => ctrl.abort();
   }, [wikiKey]);
 
+  // The tab and any shared link carry the place's own name.
+  const placeName = a?.name;
+  useEffect(() => {
+    if (placeName) document.title = `${placeName} · Pistachio Guide`;
+  }, [placeName]);
+
   useEffect(() => {
     if (!a || logged.current === a.id) return;
     logged.current = a.id;
@@ -160,12 +166,15 @@ export default function ActivityPage() {
     !ownPhotos && media?.photos.length ? { ...a, photos: media.photos.map((p) => p.src), photoCredits: media.photos.map((p) => p.credit) } : a;
   const photoCount = shown.photos?.length ?? 0;
   const credits = (shown.photoCredits ?? []).filter((c): c is PhotoCredit => Boolean(c));
-  const variants = photoCount ? shown.photos!.map((_, i) => i) : [0, 1, 2, 3];
+  // Without photos there is one illustration, shown as a banner: four copies of it would be a gallery of nothing.
+  const variants = photoCount ? shown.photos!.map((_, i) => i) : [0];
   // The big slot shows whichever picture was tapped; stay in range if the set of photos changed.
   const mainPhoto = photoCount ? Math.min(photo, photoCount - 1) : photo;
   // With real photos the desktop grid adapts to how many there are, so no cell is left empty.
   const slot = (i: number) =>
-    !photoCount || photoCount >= 5
+    !photoCount
+      ? "aspect-[16/9] md:col-span-4 md:row-span-2 md:aspect-[21/7]"
+      : photoCount >= 5
       ? i === 0 ? "aspect-[4/3] md:col-span-2 md:row-span-2 md:aspect-auto" : "aspect-[4/3] md:aspect-[4/3]"
       : photoCount === 1
         ? "aspect-[4/3] md:col-span-4 md:row-span-2 md:aspect-[21/9]"
@@ -214,14 +223,16 @@ export default function ActivityPage() {
             key={v}
             type="button"
             onClick={() => setPhoto(v)}
-            aria-label={`Show image ${i + 1}`}
-            className={cn("relative shrink-0 snap-center overflow-hidden rounded-[22px] md:w-auto", photoCount === 1 ? "w-full" : "w-[86%]", slot(i))}
+            aria-label={photoCount > 1 ? `Show photo ${i + 1}` : undefined}
+            aria-hidden={photoCount > 1 ? undefined : true}
+            tabIndex={photoCount > 1 ? undefined : -1}
+            className={cn("no-bounce relative shrink-0 snap-center overflow-hidden rounded-[22px] md:w-auto", photoCount <= 1 ? "w-full" : "w-[86%]", slot(i))}
           >
             <ActivityArt activity={shown} variant={i === 0 ? mainPhoto : v} hero={i === 0} sizes={i === 0 ? undefined : "(max-width: 768px) 86vw, 320px"} />
           </button>
         ))}
       </div>
-      {!photoCount && <p className="mt-2 text-xs text-ink-soft">Illustrations shown until the venue adds photos.</p>}
+      {!photoCount && <p className="mt-2 text-xs text-ink-soft">No photos of this place yet, so here&apos;s a drawing of the general idea.</p>}
       {credits.length > 0 && (
         <p className="mt-2 text-xs text-ink-soft">
           {credits.length > 1 ? "Photos" : "Photo"} from Wikimedia Commons:{" "}
@@ -240,7 +251,7 @@ export default function ActivityPage() {
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-sm font-extrabold uppercase tracking-wider text-ink-soft">{a.typeLabel ?? CAT[a.category].short}</span>
-            <SourceBadge a={a} />
+            {(SHOW_DEMO || a.source === "business") && <SourceBadge a={a} />}
             {a.sponsored && <SponsoredBadge />}
             {a.deal && <DealBadge />}
           </div>
@@ -253,7 +264,7 @@ export default function ActivityPage() {
               </span>
             )}
             <span>{formatWalk(km).endsWith("away") ? formatWalk(km) : `${formatDistance(km)} · ${formatWalk(km)}`}</span>
-            <span className={cn(status.open === true && "text-ok", status.open === false && "text-warn")}>{status.text}</span>
+            {status.open !== null && <span className={cn(status.open === true && "text-ok", status.open === false && "text-warn")}>{status.text}</span>}
           </div>
 
           <div className="mt-5 flex flex-wrap gap-2">
@@ -272,14 +283,15 @@ export default function ActivityPage() {
             )}
           </div>
 
-          {a.provenance && (
-            <p className={cn("mt-5 flex gap-2 rounded-2xl p-3.5 text-sm", isDemo ? "bg-demo-bg text-demo-ink" : "bg-osm-bg text-osm-ink")}>
+          {isDemo && a.provenance && (
+            <p className="mt-5 flex gap-2 rounded-2xl bg-demo-bg p-3.5 text-sm text-demo-ink">
               <Info className="mt-0.5 size-4 shrink-0" /> {a.provenance}
             </p>
           )}
 
-          <div className="mt-6 grid gap-2 sm:grid-cols-2">
-            <Fact icon={Ticket} label="Price" value={a.priceNote ? `${priceLabel(a.price)} · ${a.priceNote}` : priceLabel(a.price)} />
+          {/* Only what is actually known: a row of "not listed" boxes tells nobody anything. */}
+          <div className="mt-6 grid gap-2 empty:hidden sm:grid-cols-2">
+            {a.price != null && <Fact icon={Ticket} label="Price" value={a.priceNote ? `${priceLabel(a.price)} · ${a.priceNote}` : priceLabel(a.price)} />}
             {a.durationMin && <Fact icon={Clock} label="Takes about" value={a.durationMin >= 60 ? `${Math.round((a.durationMin / 60) * 10) / 10} hours` : `${a.durationMin} minutes`} />}
             {a.ages && <Fact icon={Users} label="Ages" value={a.ages} />}
             {a.groupMax && <Fact icon={Users} label="Group size" value={`${a.groupMin ?? 1}–${a.groupMax} people`} />}
@@ -356,21 +368,34 @@ export default function ActivityPage() {
               ) : a.openingHoursRaw ? (
                 <p className="mt-3 rounded-2xl bg-surface p-4 font-mono text-sm">{a.openingHoursRaw}</p>
               ) : (
-                <p className="mt-3 text-ink-soft">Not listed. Check with the venue before you go.</p>
+                <p className="mt-3 text-ink-soft">
+                  We don&apos;t have these yet.{" "}
+                  {a.website ? (
+                    <>
+                      <a href={a.website} target="_blank" rel="noopener noreferrer" className="font-bold text-ink underline underline-offset-2">Their website</a> will know.
+                    </>
+                  ) : (
+                    "Worth a quick check before you set off."
+                  )}
+                </p>
               )}
               {a.source === "osm" && a.openingHoursRaw && <p className="mt-2 text-xs text-ink-soft">From OpenStreetMap. Hours can be out of date.</p>}
             </div>
             <div>
-              <h2 className="text-2xl font-extrabold">Accessibility</h2>
-              <p className="mt-3 flex gap-2"><Accessibility className="mt-0.5 size-5 shrink-0 text-accent-ink" /> {a.accessNote ?? "Not recorded yet. Check with the venue."}</p>
-              <h2 className="mt-8 text-2xl font-extrabold">Booking</h2>
-              <p className="mt-3">
-                {a.booking === "partner" && "Book ahead through our booking partner. Popular times sell out."}
-                {a.booking === "walkin" && "No booking needed. Pay at the door."}
-                {a.booking === "free" && "Free. Just turn up."}
-                {a.booking === "venue" && "Book or check details directly with the venue."}
-                {a.booking === "unknown" && "We don't have booking details for this place yet."}
-              </p>
+              <h2 className="text-2xl font-extrabold">Before you go</h2>
+              {a.booking !== "unknown" && (
+                <p className="mt-3">
+                  {a.booking === "partner" && "Book ahead through our booking partner. Popular times sell out."}
+                  {a.booking === "walkin" && "No booking needed. Pay at the door."}
+                  {a.booking === "free" && "Free. Just turn up."}
+                  {a.booking === "venue" && "Book or check details directly with the venue."}
+                </p>
+              )}
+              {a.accessible != null ? (
+                <p className="mt-3 flex gap-2"><Accessibility className="mt-0.5 size-5 shrink-0 text-accent-ink" /> {a.accessNote}</p>
+              ) : (
+                <p className="mt-3 flex gap-2 text-ink-soft"><Accessibility className="mt-0.5 size-5 shrink-0" /> We don&apos;t know about step-free access here yet. Ask the venue if you need it.</p>
+              )}
               {(a.website || a.phone) && (
                 <ul className="mt-3 space-y-2 text-sm font-bold">
                   {a.website && (
@@ -388,18 +413,20 @@ export default function ActivityPage() {
 
           <section id="location" className="mt-10 scroll-mt-24">
             <h2 className="text-2xl font-extrabold">Location</h2>
-            <p className="mt-2 text-ink-soft">{isDemo ? "Demo listing, so this pin is a sample position with no real address." : a.address ?? "Address not recorded in OpenStreetMap."}</p>
+            {(isDemo || a.address) && <p className="mt-2 text-ink-soft">{isDemo ? "Demo listing, so this pin is a sample position with no real address." : a.address}</p>}
             <div className="mt-3 h-72">
               <DiscoveryMap activities={[a]} selectedId={a.id} showWalkRing={false} className="h-full" />
             </div>
             {a.osm && (
               <p className="mt-2 text-xs text-ink-soft">
-                Something wrong? <a href={`https://www.openstreetmap.org/${a.osm.type}/${a.osm.id}`} target="_blank" rel="noopener noreferrer" className="underline">Improve it on OpenStreetMap</a> or{" "}
+                Details come from OpenStreetMap and can be out of date. Something wrong? <a href={`https://www.openstreetmap.org/${a.osm.type}/${a.osm.id}`} target="_blank" rel="noopener noreferrer" className="underline">Improve it on OpenStreetMap</a> or{" "}
                 <Link href={`/business?claim=${a.id}`} className="underline">claim this listing</Link>.
               </p>
             )}
           </section>
 
+          {/* Reviews appear once there are real ones to show; an empty heading promises something that isn't there. */}
+          {isDemo && (
           <section className="mt-10">
             <h2 className="text-2xl font-extrabold">Reviews</h2>
             {isDemo ? (
@@ -423,6 +450,7 @@ export default function ActivityPage() {
               <p className="mt-3 text-ink-soft">No reviews yet. OpenStreetMap doesn&apos;t include reviews, and we won&apos;t make any up.</p>
             )}
           </section>
+          )}
         </div>
 
         <aside>
@@ -433,15 +461,20 @@ export default function ActivityPage() {
                 <p className="mt-3 font-bold">{a.booking === "free" ? "No ticket, no booking. Just turn up." : "Free to visit."}</p>
                 {a.priceNote && <p className="mt-1 text-sm text-ink-soft">{a.priceNote}</p>}
               </>
-            ) : (
+            ) : a.price != null ? (
               <>
                 <div className="font-display text-4xl font-extrabold tabular">{priceLabel(a.price)}</div>
                 {a.priceNote && <p className="text-sm text-ink-soft">{a.priceNote}</p>}
               </>
+            ) : (
+              <>
+                <div className="font-display text-3xl font-extrabold">Fancy it?</div>
+                <p className="mt-1 text-sm text-ink-soft">{a.website ? "Check prices and times with the venue, then go." : "Save it for later, or head straight there."}</p>
+              </>
             )}
             {a.deal && <p className="mt-3 rounded-xl bg-surface-2 p-3 text-sm font-bold">{a.deal}</p>}
             <div className="mt-5 flex flex-col gap-2">
-              {a.booking === "partner" || (a.booking === "venue" && a.website) ? (
+              {a.booking === "partner" ? (
                 <button
                   type="button"
                   onClick={() => {
@@ -450,8 +483,19 @@ export default function ActivityPage() {
                   }}
                   className="rounded-full bg-primary py-3.5 font-extrabold text-on-primary"
                 >
-                  {a.booking === "partner" ? "Check availability & book" : "Book with the venue"}
+                  Check availability &amp; book
                 </button>
+              ) : a.website ? (
+                // A real venue's own site opens directly: no partner is involved, so there is nothing to explain first.
+                <a
+                  href={a.website}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => logEvent(a.id, "website_click")}
+                  className="flex items-center justify-center gap-2 rounded-full bg-primary py-3.5 font-extrabold text-on-primary"
+                >
+                  Visit their website <ExternalLink className="size-4" />
+                </a>
               ) : a.booking === "venue" ? (
                 <p className="rounded-xl bg-surface-2 p-3 text-sm">Book directly with the venue. {isDemo && "(Demo listing: no real contact details.)"}</p>
               ) : null}
@@ -461,14 +505,16 @@ export default function ActivityPage() {
                 </a>
               )}
             </div>
-            <p className="mt-4 text-xs text-ink-soft">{status.text}{a.durationMin ? ` · about ${a.durationMin} min` : ""}</p>
+            {(status.open !== null || a.durationMin) && (
+              <p className="mt-4 text-xs text-ink-soft">{[status.open !== null ? status.text : null, a.durationMin ? `about ${a.durationMin} min` : null].filter(Boolean).join(" · ")}</p>
+            )}
           </div>
         </aside>
       </div>
 
       {nearby.length > 0 && (
         <section className="mt-16">
-          <h2 className="mb-5 text-3xl font-extrabold">Nearby</h2>
+          <h2 className="mb-5 text-3xl font-extrabold">While you&apos;re in the area</h2>
           <div className="rail">
             {nearby.map((x) => (
               <ActivityCard key={x.id} a={x} compact />
