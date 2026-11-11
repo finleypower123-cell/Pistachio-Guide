@@ -134,6 +134,22 @@ assert.equal(photonToElement({ properties: { osm_id: 1, osm_type: "N", osm_key: 
   assert.ok(new Set(best.slice(0, 3)).size >= 2, "top of the list is mixed: " + best.join(","));
 }
 
+// ---- kinds of place worked out from names when the record is basic ----
+{
+  const sc = (name: string, extra: Record<string, string> = {}) => elementToActivity({ type: "node", id: 77, lat: 1, lon: 1, tags: { leisure: "sports_centre", name, ...extra } })!;
+  assert.equal(sc("Piscine communale d'Ixelles").category, "swim");
+  assert.equal(sc("Zwembad Neptunus").category, "swim");
+  assert.equal(sc("Petite Île Escalade").category, "climbing");
+  assert.equal(sc("Basic-Fit").category, "leisure");
+  assert.equal(sc("Aqua Centre", { sport: "swimming" }).category, "swim", "the sport tag still decides when present");
+  // A games shop is findable but does not count as an unusual outing or lead the list
+  const shop = elementToActivity({ type: "node", id: 78, lat: 1, lon: 1, tags: { shop: "games", name: "Dice Shop" } })!;
+  const esc = elementToActivity({ type: "node", id: 79, lat: 1, lon: 1, tags: { leisure: "escape_game", name: "Locked" } })!;
+  const c0 = { label: "x", lat: 1, lng: 1 };
+  assert.deepEqual(applyFilters([shop, esc], { ...defaultFilters(), tags: ["weird"] }, c0).map((a) => a.name), ["Locked"]);
+  assert.equal(applyFilters([shop, esc], defaultFilters(), c0)[0].name, "Locked");
+}
+
 // ---- friendly descriptions ----
 {
   const cafe = elementToActivity({ type: "node", id: 42, lat: 1, lon: 1, tags: { amenity: "cafe", name: "Bean There" } })!;

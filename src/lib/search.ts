@@ -54,7 +54,8 @@ export function availableDetails(list: Activity[]) {
  */
 const EXPERIENCES = new Set<CategoryId>(["escape", "arcade", "boardgame", "golf", "trampoline", "climbing", "water"]);
 
-const hasTag = (a: Activity, t: Tag) => a.tags.includes(t) || (t === "weird" && EXPERIENCES.has(a.category));
+// A shop that sells games shares the board-game café category but is not an outing in itself.
+const hasTag = (a: Activity, t: Tag) => a.tags.includes(t) || (t === "weird" && EXPERIENCES.has(a.category) && a.typeLabel !== "Games shop");
 
 /** Lower-case with accents removed, so "Musée" matches "musee" and "café" matches "cafe". */
 export const plain = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -182,6 +183,8 @@ export function score(a: Activity, center: Place, weather?: Weather | null) {
   if (hasTag(a, "weird")) s += 0.3;
   if (weather?.isWet) s += a.indoor ? 1.2 : a.indoor === false ? -1.5 : 0;
   if (a.source === "osm" && a.category === "chaincafe") s -= 0.8;
+  // Gyms, sports clubs and shops are useful to find but aren't what people open a fun-things guide for.
+  if (a.source === "osm" && (a.typeLabel === "Leisure centre" || a.typeLabel === "Games shop")) s -= 0.6;
   return s;
 }
 

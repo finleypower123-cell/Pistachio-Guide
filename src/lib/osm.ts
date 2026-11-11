@@ -80,10 +80,15 @@ function classify(t: Record<string, string>): Mapped | null {
       return { category: "trampoline", typeLabel: "Trampoline park" };
     case "swimming_pool":
       return { category: "swim", typeLabel: "Swimming pool" };
-    case "sports_centre":
-      return t.sport === "swimming"
-        ? { category: "swim", typeLabel: "Swimming centre" }
-        : { category: "leisure", typeLabel: "Leisure centre" };
+    case "sports_centre": {
+      // The sport tag says what a centre is for. Basic records don't carry it, so a name that
+      // plainly says "pool" or "climbing" (in English, French, Dutch or German) counts too.
+      const name = (t.name ?? "").toLowerCase();
+      if (t.sport === "swimming" || /\b(swimming|pool|piscine|zwembad|schwimmbad|hallenbad|lido|baths)\b/.test(name))
+        return { category: "swim", typeLabel: "Swimming centre" };
+      if (t.sport === "climbing" || /\b(climbing|boulder\w*|escalade|klim\w*|kletter\w*)\b/.test(name)) return { category: "climbing", typeLabel: "Climbing" };
+      return { category: "leisure", typeLabel: "Leisure centre" };
+    }
   }
   switch (t.amenity) {
     case "cafe":
