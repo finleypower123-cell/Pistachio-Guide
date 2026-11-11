@@ -6,7 +6,7 @@ import { demoActivities } from "@/lib/demo-data";
 import { loadNearbyPlaces } from "@/lib/discover";
 import { DEFAULT_PLACE } from "@/lib/geo";
 import { defaultFilters, loadRangeKm, type Filters } from "@/lib/search";
-import { loadAreaPhotos, withAreaPhotos, type AreaPhotos } from "@/lib/wiki";
+import { cachedAreaPhotos, loadAreaPhotos, withAreaPhotos, type AreaPhotos } from "@/lib/wiki";
 import { PREVIEW, SHOW_DEMO } from "@/lib/preview";
 import { local } from "@/lib/storage";
 import type { Activity, Place, Weather } from "@/lib/types";
@@ -124,11 +124,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // Real photos from Wikimedia for the loaded places. This starts only once the places are in,
   // and never holds them up: cards show their illustration until a photo is found.
   const [areaPhotos, setAreaPhotos] = useState<AreaPhotos>({});
+  // Photos found on an earlier visit are shown with the places, without waiting for anything.
   useEffect(() => {
-    if (PREVIEW || osmStatus !== "ok" || !osm.length) {
-      setAreaPhotos({});
-      return;
-    }
+    if (!hydrated || PREVIEW) return;
+    setAreaPhotos(cachedAreaPhotos(place, rangeKm) ?? {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hydrated, place.lat, place.lng, rangeKm]);
+  useEffect(() => {
+    if (PREVIEW || osmStatus !== "ok" || !osm.length) return;
     const ctrl = new AbortController();
     loadAreaPhotos(osm, place, rangeKm, ctrl.signal)
       .then((photos) => {

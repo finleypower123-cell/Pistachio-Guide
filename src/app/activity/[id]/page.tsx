@@ -229,7 +229,7 @@ export default function ActivityPage() {
             tabIndex={photoCount > 1 ? undefined : -1}
             className={cn("no-bounce relative shrink-0 snap-center overflow-hidden rounded-[22px] md:w-auto", photoCount <= 1 ? "w-full" : "w-[86%]", slot(i))}
           >
-            <ActivityArt activity={shown} variant={i === 0 ? mainPhoto : v} hero={i === 0} sizes={i === 0 ? undefined : "(max-width: 768px) 86vw, 320px"} />
+            <ActivityArt activity={shown} variant={i === 0 ? mainPhoto : v} hero={i === 0} priority={i === 0} sizes={i === 0 ? undefined : "(max-width: 768px) 86vw, 320px"} />
           </button>
         ))}
       </div>

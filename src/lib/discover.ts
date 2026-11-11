@@ -38,8 +38,10 @@ const FRIENDLY = "Couldn't load real places just now. Try again in a minute.";
 // ---- on-device cache -------------------------------------------------------------------------
 
 const CACHE_KEY = "pg:places-cache:v1";
-const FULL_TTL_MS = 6 * 3600_000;
-const PARTIAL_TTL_MS = 3600_000;
+const FULL_TTL_MS = 24 * 3600_000;
+const PARTIAL_TTL_MS = 6 * 3600_000;
+/** Older results are still shown straight away while fresh ones load behind them. */
+const STALE_OK_MS = 30 * 86_400_000;
 const MAX_AREAS = 3;
 
 interface CacheEntry {
@@ -49,13 +51,14 @@ interface CacheEntry {
   places: Activity[];
 }
 
-function readCache(key: string): Activity[] | null {
+function readCache(key: string): { places: Activity[]; fresh: boolean } | null {
   try {
     if (typeof localStorage === "undefined") return null;
     const all = JSON.parse(localStorage.getItem(CACHE_KEY) ?? "[]") as CacheEntry[];
     const hit = all.find((e) => e.key === key);
-    if (!hit || Date.now() - hit.at > (hit.full ? FULL_TTL_MS : PARTIAL_TTL_MS)) return null;
-    return hit.places;
+    const age = hit ? Date.now() - hit.at : Infinity;
+    if (!hit || age > STALE_OK_MS) return null;
+    return { places: hit.places, fresh: age <= (hit.full ? FULL_TTL_MS : PARTIAL_TTL_MS) };
   } catch {
     return null;
   }
@@ -86,9 +89,18 @@ export async function loadNearbyPlaces(
   const rl = roundCoord(lat);
   const rg = roundCoord(lng);
   const key = `${rl},${rg},${radiusM}`;
-  if (!opts.fresh) {
-    const cached = readCache(key);
-    if (cached) return cached;
+  // Saved results appear at once. If they are recent that is the answer; if they are older they
+  // stay on screen while a fresh set loads behind them, and remain if that load fails.
+  const saved = opts.fresh ? null : readCache(key);
+  if (saved?.fresh) return saved.places;
+  if (saved) {
+    opts.onProgress?.(saved.places);
+    try {
+      return await loadNearbyPlaces(lat, lng, radiusM, signal, { fresh: true });
+    } catch (e) {
+      if (signal?.aborted) throw e;
+      return saved.places;
+    }
   }
 
   // Our route serves up to 5 km. Wider searches go straight to Photon, which returns the nearest

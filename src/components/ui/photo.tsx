@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { PhotoCredit } from "@/lib/types";
-import { thumbSrcSet } from "@/lib/wiki";
+import { directSrcSet, directThumb, thumbSrcSet } from "@/lib/wiki";
 import { cn } from "@/lib/utils";
 
 /**
@@ -10,9 +10,27 @@ import { cn } from "@/lib/utils";
  * the photo arrives: it fades in over the illustration, and if it fails to load the illustration
  * simply stays. Photos load lazily and at a size that fits the box, never the full original.
  */
-export function Photo({ src, alt, hero = false, sizes, className }: { src: string; alt: string; hero?: boolean; sizes?: string; className?: string }) {
+export function Photo({
+  src,
+  alt,
+  hero = false,
+  sizes,
+  priority = false,
+  className,
+}: {
+  src: string;
+  alt: string;
+  hero?: boolean;
+  sizes?: string;
+  /** For the first photos on a screen: fetched straight away and ahead of other images. */
+  priority?: boolean;
+  className?: string;
+}) {
   const ref = useRef<HTMLImageElement>(null);
   const [state, setState] = useState<"loading" | "shown" | "failed">("loading");
+  // The image server's own address is tried first (no redirect); the redirecting one is the fallback.
+  const [redirecting, setRedirecting] = useState(false);
+  const direct = redirecting ? undefined : directThumb(src);
 
   // A cached image can finish loading before React attaches its handlers.
   useEffect(() => {
@@ -21,19 +39,20 @@ export function Photo({ src, alt, hero = false, sizes, className }: { src: strin
   }, [src]);
 
   if (state === "failed") return null;
-  const srcSet = thumbSrcSet(src, hero);
+  const srcSet = (direct && directSrcSet(src, hero)) || thumbSrcSet(src, hero);
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
       ref={ref}
-      src={src}
+      src={direct ?? src}
       srcSet={srcSet}
       sizes={srcSet ? (sizes ?? (hero ? "(max-width: 768px) 90vw, 640px" : "(max-width: 640px) 120px, 420px")) : undefined}
       alt={alt}
-      loading="lazy"
+      loading={priority ? "eager" : "lazy"}
+      fetchPriority={priority ? "high" : undefined}
       decoding="async"
       onLoad={() => setState("shown")}
-      onError={() => setState("failed")}
+      onError={() => (direct ? setRedirecting(true) : setState("failed"))}
       className={cn("absolute inset-0 h-full w-full object-cover transition-opacity duration-500", state === "shown" ? "opacity-100" : "opacity-0", className)}
     />
   );

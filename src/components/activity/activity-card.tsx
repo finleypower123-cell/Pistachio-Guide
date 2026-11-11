@@ -18,7 +18,7 @@ import { SaveButton } from "./save-button";
  * A place card. With `row`, phones get a compact row (small picture beside the text) so a list
  * shows several places per screen; larger screens keep the full card.
  */
-export function ActivityCard({ a, className, compact = false, row = false }: { a: Activity; className?: string; compact?: boolean; row?: boolean }) {
+export function ActivityCard({ a, className, compact = false, row = false, priority = false }: { a: Activity; className?: string; compact?: boolean; row?: boolean; priority?: boolean }) {
   const { place } = useApp();
   const km = distanceKm(place, a);
   const status = a.hours ? openStatus(a.hours) : null;
@@ -26,7 +26,7 @@ export function ActivityCard({ a, className, compact = false, row = false }: { a
     <article className={cn("group relative flex overflow-hidden rounded-[22px] bg-surface shadow-card transition hover:-translate-y-0.5", row ? "flex-row sm:flex-col" : "flex-col", className)}>
       <Link href={`/activity/${a.id}`} className="absolute inset-0 z-[1]" aria-label={a.name} />
       <div className={cn("relative overflow-hidden", row ? "w-28 shrink-0 self-stretch sm:aspect-[4/3] sm:w-auto" : compact ? "aspect-[16/10]" : "aspect-[4/3]")}>
-        <ActivityArt activity={a} sizes={row ? "(max-width: 640px) 112px, 420px" : "320px"} className="transition duration-500 group-hover:scale-[1.03]" />
+        <ActivityArt activity={a} sizes={row ? "(max-width: 640px) 112px, 420px" : "320px"} priority={priority} className="transition duration-500 group-hover:scale-[1.03]" />
         {a.photoCredits?.[0] && <PhotoCreditMark credit={a.photoCredits[0]} className="absolute bottom-1.5 right-1.5 z-[2]" />}
         <div className={cn("absolute flex flex-wrap gap-1.5", row ? "left-2 top-2 sm:left-3 sm:top-3" : "left-3 top-3")}>
           <PriceBadge a={a} />
