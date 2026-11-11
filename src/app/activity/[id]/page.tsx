@@ -118,12 +118,6 @@ export default function ActivityPage() {
     return () => ctrl.abort();
   }, [wikiKey]);
 
-  // The tab and any shared link carry the place's own name.
-  const placeName = a?.name;
-  useEffect(() => {
-    if (placeName) document.title = `${placeName} · Pistachio Guide`;
-  }, [placeName]);
-
   useEffect(() => {
     if (!a || logged.current === a.id) return;
     logged.current = a.id;
@@ -211,6 +205,8 @@ export default function ActivityPage() {
 
   return (
     <div className="gutter mx-auto max-w-7xl pb-10 pt-4 md:pt-8">
+      {/* React moves this into the page head, so the tab carries the place's own name. */}
+      <title>{`${a.name} · Pistachio Guide`}</title>
       <nav className="mb-4 text-sm font-semibold text-ink-soft" aria-label="Breadcrumb">
         <Link href="/explore" className="hover:underline">Explore</Link> /{" "}
         <Link href={`/explore?cat=${a.category}`} className="hover:underline">{CAT[a.category].label}</Link>
