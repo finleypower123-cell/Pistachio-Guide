@@ -57,7 +57,7 @@ function Rail({ items }: { items: Activity[] }) {
     return (
       <div className="rail" aria-busy="true">
         {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="h-[320px] animate-pulse rounded-[22px] bg-surface-2" />
+          <div key={i} className="skeleton h-[320px] rounded-[22px]" />
         ))}
       </div>
     );
@@ -69,7 +69,7 @@ function Rail({ items }: { items: Activity[] }) {
     );
   if (!items.length) return <p className="rounded-2xl bg-surface-2 p-5 text-ink-soft">Nothing here near this location yet.</p>;
   return (
-    <div className="rail">
+    <div className="rail stagger">
       {items.map((a) => (
         <ActivityCard key={a.id} a={a} />
       ))}
