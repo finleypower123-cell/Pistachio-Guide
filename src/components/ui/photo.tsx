@@ -28,7 +28,7 @@ export function Photo({ src, alt, hero = false, sizes, className }: { src: strin
       ref={ref}
       src={src}
       srcSet={srcSet}
-      sizes={srcSet ? (sizes ?? (hero ? "(max-width: 768px) 90vw, 640px" : "(max-width: 640px) 160px, 420px")) : undefined}
+      sizes={srcSet ? (sizes ?? (hero ? "(max-width: 768px) 90vw, 640px" : "(max-width: 640px) 120px, 420px")) : undefined}
       alt={alt}
       loading="lazy"
       decoding="async"
@@ -39,7 +39,11 @@ export function Photo({ src, alt, hero = false, sizes, className }: { src: strin
   );
 }
 
-/** A small, unobtrusive credit that links to the photo's own page, where the full licence is. */
+/**
+ * A small, unobtrusive credit that links to the photo's own page, where the full licence is.
+ * Used on cards and other large pictures. Small thumbnails that are themselves links to the place
+ * page carry no mark (a link cannot sit inside a link); the place page shows the full credit.
+ */
 export function PhotoCreditMark({ credit, className }: { credit: PhotoCredit; className?: string }) {
   return (
     <a
