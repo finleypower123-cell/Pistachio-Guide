@@ -2,6 +2,7 @@ import { blurbFor } from "./blurbs";
 import { CAT } from "./categories";
 import { parseOsmHours } from "./hours";
 import type { Activity, CategoryId, Tag } from "./types";
+import { wikiRefFromTags } from "./wiki";
 
 /**
  * OpenStreetMap discovery via the Overpass API.
@@ -186,6 +187,7 @@ export function elementToActivity(el: OsmElement): Activity | null {
     website,
     phone: t.phone ?? t["contact:phone"],
     osm: { type: el.type, id: el.id },
+    wiki: wikiRefFromTags(t),
     provenance: "Real place from OpenStreetMap. Prices, ratings and reviews aren't part of OSM, so we don't show them.",
   };
 }

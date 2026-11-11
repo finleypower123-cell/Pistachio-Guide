@@ -19,9 +19,10 @@ import { PREVIEW } from "@/lib/preview";
 import { CAT, TAG_LABEL } from "@/lib/categories";
 import { sampleReviews } from "@/lib/demo-data";
 import { loadPlaceById } from "@/lib/discover";
+import { loadPlaceMedia, visitorLangs, type PlaceMedia } from "@/lib/wiki";
 import { distanceKm, formatDistance, formatWalk } from "@/lib/geo";
 import { formatRange, openStatus, weekRows } from "@/lib/hours";
-import type { Activity } from "@/lib/types";
+import type { Activity, PhotoCredit, WikiRef } from "@/lib/types";
 import { cn, priceLabel } from "@/lib/utils";
 
 function Fact({ icon: Icon, label, value }: { icon: typeof Clock; label: string; value: string }) {
@@ -101,6 +102,22 @@ export default function ActivityPage() {
       });
   }, [id, hydrated, findActivity, fetched]);
 
+  // Real photos and a description from Wikimedia, for places OpenStreetMap links to Wikipedia,
+  // Wikidata or Commons. Loaded after the page shows; the illustration stays until then.
+  const [media, setMedia] = useState<PlaceMedia | null>(null);
+  const wikiKey = a?.wiki ? JSON.stringify(a.wiki) : "";
+  useEffect(() => {
+    setMedia(null);
+    if (PREVIEW || !wikiKey) return;
+    const ctrl = new AbortController();
+    loadPlaceMedia(JSON.parse(wikiKey) as WikiRef, visitorLangs(), ctrl.signal)
+      .then((m) => {
+        if (!ctrl.signal.aborted) setMedia(m);
+      })
+      .catch(() => {});
+    return () => ctrl.abort();
+  }, [wikiKey]);
+
   useEffect(() => {
     if (!a || logged.current === a.id) return;
     logged.current = a.id;
@@ -137,7 +154,28 @@ export default function ActivityPage() {
   const km = distanceKm(place, a);
   const status = openStatus(a.hours);
   const isDemo = a.source === "demo";
-  const variants = a.photos?.length ? a.photos.map((_, i) => i) : [0, 1, 2, 3];
+  // A venue's own photos come first; otherwise Wikimedia photos of this place, each with its credit.
+  const ownPhotos = Boolean(a.photos?.length) && !a.photoCredits?.length;
+  const shown: Activity =
+    !ownPhotos && media?.photos.length ? { ...a, photos: media.photos.map((p) => p.src), photoCredits: media.photos.map((p) => p.credit) } : a;
+  const photoCount = shown.photos?.length ?? 0;
+  const credits = (shown.photoCredits ?? []).filter((c): c is PhotoCredit => Boolean(c));
+  const variants = photoCount ? shown.photos!.map((_, i) => i) : [0, 1, 2, 3];
+  // The big slot shows whichever picture was tapped; stay in range if the set of photos changed.
+  const mainPhoto = photoCount ? Math.min(photo, photoCount - 1) : photo;
+  // With real photos the desktop grid adapts to how many there are, so no cell is left empty.
+  const slot = (i: number) =>
+    !photoCount || photoCount >= 5
+      ? i === 0 ? "aspect-[4/3] md:col-span-2 md:row-span-2 md:aspect-auto" : "aspect-[4/3] md:aspect-[4/3]"
+      : photoCount === 1
+        ? "aspect-[4/3] md:col-span-4 md:row-span-2 md:aspect-[21/9]"
+        : photoCount === 2
+          ? "aspect-[4/3] md:col-span-2 md:row-span-2 md:aspect-[4/3]"
+          : i === 0
+            ? "aspect-[4/3] md:col-span-2 md:row-span-2 md:aspect-auto"
+            : photoCount === 3
+              ? "aspect-[4/3] md:col-span-2 md:aspect-[2/1]"
+              : i === 3 ? "aspect-[4/3] md:col-span-2 md:aspect-auto" : "aspect-[4/3] md:aspect-[4/3]";
   const today = new Date().getDay();
 
   const share = async () => {
@@ -171,22 +209,32 @@ export default function ActivityPage() {
 
       {/* Gallery: swipe on phones, grid on desktop */}
       <div className="no-scrollbar -mx-4 flex snap-x snap-mandatory gap-2 overflow-x-auto px-4 md:mx-0 md:grid md:grid-cols-4 md:grid-rows-2 md:overflow-visible md:px-0">
-        {variants.slice(0, 4).map((v, i) => (
+        {variants.slice(0, photoCount ? 5 : 4).map((v, i) => (
           <button
             key={v}
             type="button"
             onClick={() => setPhoto(v)}
             aria-label={`Show image ${i + 1}`}
-            className={cn(
-              "relative w-[86%] shrink-0 snap-center overflow-hidden rounded-[22px] md:w-auto",
-              i === 0 ? "aspect-[4/3] md:col-span-2 md:row-span-2 md:aspect-auto" : "aspect-[4/3] md:aspect-[4/3]",
-            )}
+            className={cn("relative shrink-0 snap-center overflow-hidden rounded-[22px] md:w-auto", photoCount === 1 ? "w-full" : "w-[86%]", slot(i))}
           >
-            <ActivityArt activity={a} variant={i === 0 ? photo : v} />
+            <ActivityArt activity={shown} variant={i === 0 ? mainPhoto : v} hero={i === 0} sizes={i === 0 ? undefined : "(max-width: 768px) 86vw, 320px"} />
           </button>
         ))}
       </div>
-      {!a.photos?.length && <p className="mt-2 text-xs text-ink-soft">Illustrations shown until the venue adds photos.</p>}
+      {!photoCount && <p className="mt-2 text-xs text-ink-soft">Illustrations shown until the venue adds photos.</p>}
+      {credits.length > 0 && (
+        <p className="mt-2 text-xs text-ink-soft">
+          {credits.length > 1 ? "Photos" : "Photo"} from Wikimedia Commons:{" "}
+          {credits.map((c, i) => (
+            <span key={c.page}>
+              {i > 0 && " · "}
+              <a href={c.page} target="_blank" rel="noopener noreferrer" className="underline">
+                {[c.by ?? "see credit", c.license].filter(Boolean).join(", ")}
+              </a>
+            </span>
+          ))}
+        </p>
+      )}
 
       <div className="mt-6 grid gap-10 lg:grid-cols-[1fr_360px]">
         <div className="min-w-0">
@@ -239,7 +287,23 @@ export default function ActivityPage() {
 
           <section className="mt-10">
             <h2 className="text-2xl font-extrabold">About</h2>
-            <p className="mt-3 max-w-[65ch] text-[17px]">{a.about ?? a.summary}</p>
+            {!a.about && media?.text ? (
+              <>
+                <p className="mt-3 max-w-[65ch] text-[17px]" lang={media.text.lang}>{media.text.text}</p>
+                <p className="mt-2 text-xs text-ink-soft">
+                  From{" "}
+                  <a href={media.text.url} target="_blank" rel="noopener noreferrer" className="underline">
+                    Wikipedia: {media.text.title}
+                  </a>
+                  , text under{" "}
+                  <a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noopener noreferrer" className="underline">
+                    CC BY-SA 4.0
+                  </a>
+                </p>
+              </>
+            ) : (
+              <p className="mt-3 max-w-[65ch] text-[17px]">{a.about ?? a.summary}</p>
+            )}
             {a.special && (
               <div className="mt-5 rounded-[22px] bg-accent/40 p-5">
                 <h3 className="font-sans text-sm font-extrabold uppercase tracking-wider text-accent-ink">What makes it special</h3>

@@ -20,6 +20,7 @@ Built with Next.js 15, TypeScript, Tailwind CSS 4, MapLibre GL and (optionally) 
 | Badge | Source | What we show |
 | --- | --- | --- |
 | **OpenStreetMap** | Overpass API around the chosen location, with Photon and the OpenStreetMap API as backups | Only what OSM records: name, location, type, opening hours, website, phone, wheelchair access, address, `fee=no`. No prices, ratings or reviews are invented. |
+| **Wikimedia** | Wikidata, Wikipedia and Wikimedia Commons, queried from the browser | Real photos and a short description for places that have them. A place gets a photo only when its OpenStreetMap record links to Wikidata or Commons, or a nearby Wikidata item has the same name and is the same kind of place. Every photo links to its Commons page for credit; text is credited to Wikipedia (CC BY-SA 4.0) |
 | **Verified** | A business that claimed its listing and was verified | Their edits, photos, offers and events. |
 
 Real places link to their own website. Sample ("demo") listings from `src/lib/demo-data.ts` appear only in the offline single-file preview (`npm run build:preview`), which can't load real places; the live site never shows them.
@@ -78,12 +79,13 @@ tests/logic.test.ts    unit tests
 
 - Real places come from three free OpenStreetMap services, none of which is meant to carry a commercial app's traffic. Overpass (full records, asked from `/api/discover`) is often overloaded or refuses requests, so the browser falls back to Photon (name, type, address and location only), and the OpenStreetMap API fills in hours, website and accessibility when a place is opened. For real traffic, use a paid Overpass or places provider, or host your own, and change `OVERPASS_ENDPOINTS` in `src/lib/osm.ts` and the URLs in `src/lib/places-fallback.ts`.
 - Overpass answers are cached at the CDN for 6 hours and geocoding for 7 days; failures are never cached. Places are also cached on the device (6 hours for full records, 1 hour for basic ones).
+- Photos and descriptions (`src/lib/wiki.ts`) come from Wikimedia's public APIs with no key. Most museums, parks, theatres and landmarks have one; most cafés and small shops do not, and keep their illustration until the venue uploads photos. Wikimedia serves thumbnails only at fixed widths (330, 500 and 960 px are used); other sizes are refused. Results are cached on the device for a week.
 - OpenFreeMap tiles are free with no key. To switch providers, change `defaultStyles` in `src/components/map/map.tsx`.
 - Illustrations stand in for photos until a venue uploads its own.
 
 ## Credits
 
-Map components from [mapcn](https://github.com/AnmolSaini16/mapcn), Supabase helpers from [nextjs-supabase-shadcn-boilerplate](https://github.com/Barty-Bart/nextjs-supabase-shadcn-boilerplate), OSM category mapping from [TRIP](https://github.com/itskovacs/TRIP), tile setup informed by [nextjs-maplibre-starter](https://github.com/wellywahyudi/nextjs-maplibre-starter). All MIT; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Map data © OpenStreetMap contributors.
+Map components from [mapcn](https://github.com/AnmolSaini16/mapcn), Supabase helpers from [nextjs-supabase-shadcn-boilerplate](https://github.com/Barty-Bart/nextjs-supabase-shadcn-boilerplate), OSM category mapping from [TRIP](https://github.com/itskovacs/TRIP), tile setup informed by [nextjs-maplibre-starter](https://github.com/wellywahyudi/nextjs-maplibre-starter). All MIT; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Map data © OpenStreetMap contributors. Photos from Wikimedia Commons under each file's own licence, and descriptions from Wikipedia under CC BY-SA 4.0, each credited where shown.
 
 ## Launch settings
 

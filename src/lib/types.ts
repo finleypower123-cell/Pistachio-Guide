@@ -37,6 +37,24 @@ export type WeeklyHours = ([number, number] | null)[];
 
 export type BookingType = "partner" | "walkin" | "free" | "venue" | "unknown";
 
+/** Links from a place to Wikimedia projects, as recorded on its OpenStreetMap entry. */
+export interface WikiRef {
+  wikipedia?: { lang: string; title: string };
+  /** Wikidata item id, e.g. "Q968055" */
+  wikidata?: string;
+  /** Commons category name, without the "Category:" prefix */
+  commonsCategory?: string;
+  /** Commons file name, without the "File:" prefix */
+  commonsFile?: string;
+}
+
+/** Who to credit for a photo. `page` is the file's own page, which carries the full licence. */
+export interface PhotoCredit {
+  page: string;
+  by?: string;
+  license?: string;
+}
+
 export interface Activity {
   id: string;
   source: Source;
@@ -76,6 +94,10 @@ export interface Activity {
   deal?: string;
   events?: BusinessEvent[];
   photos?: string[];
+  /** Credits for `photos`, by position. Present for photos from Wikimedia Commons, which require one. */
+  photoCredits?: (PhotoCredit | undefined)[];
+  /** Wikipedia, Wikidata and Commons links from the OpenStreetMap record, used to find photos and a description */
+  wiki?: WikiRef;
   /** OSM reference for attribution and edit links */
   osm?: { type: "node" | "way" | "relation"; id: number };
   /** Plain-language note about what the data source does and doesn't tell us */

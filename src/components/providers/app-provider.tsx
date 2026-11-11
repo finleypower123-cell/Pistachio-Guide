@@ -6,6 +6,7 @@ import { demoActivities } from "@/lib/demo-data";
 import { loadNearbyPlaces } from "@/lib/discover";
 import { DEFAULT_PLACE } from "@/lib/geo";
 import { defaultFilters, loadRangeKm, type Filters } from "@/lib/search";
+import { loadAreaPhotos, withAreaPhotos, type AreaPhotos } from "@/lib/wiki";
 import { PREVIEW, SHOW_DEMO } from "@/lib/preview";
 import { local } from "@/lib/storage";
 import type { Activity, Place, Weather } from "@/lib/types";
@@ -120,10 +121,33 @@ export function AppProvider({ children }: { children: ReactNode }) {
     loadOverlays().then(setOverlays).catch(() => {});
   }, [hydrated, overlayNonce]);
 
+  // Real photos from Wikimedia for the loaded places. This starts only once the places are in,
+  // and never holds them up: cards show their illustration until a photo is found.
+  const [areaPhotos, setAreaPhotos] = useState<AreaPhotos>({});
+  useEffect(() => {
+    if (PREVIEW || osmStatus !== "ok" || !osm.length) {
+      setAreaPhotos({});
+      return;
+    }
+    const ctrl = new AbortController();
+    loadAreaPhotos(osm, place, rangeKm, ctrl.signal)
+      .then((photos) => {
+        if (!ctrl.signal.aborted) setAreaPhotos(photos);
+      })
+      .catch(() => {});
+    return () => ctrl.abort();
+    // `osm` is complete whenever the status is "ok", and the location and range identify the search.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [osmStatus, place.lat, place.lng, rangeKm]);
+
   const activities = useMemo(() => {
     const byId = new Map(overlays.map((o) => [o.activityId, o]));
-    return [...(SHOW_DEMO ? demoActivities(place) : []), ...osm].map((a) => applyOverlay(a, byId.get(a.id)));
-  }, [place, osm, overlays]);
+    // A business's own photos (from its overlay) take priority over Wikimedia ones.
+    return withAreaPhotos(
+      [...(SHOW_DEMO ? demoActivities(place) : []), ...osm].map((a) => applyOverlay(a, byId.get(a.id))),
+      areaPhotos,
+    );
+  }, [place, osm, overlays, areaPhotos]);
 
   const findActivity = useCallback((id: string) => activities.find((a) => a.id === id), [activities]);
 

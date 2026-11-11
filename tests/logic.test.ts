@@ -6,6 +6,11 @@ import { blurbFor } from "../src/lib/blurbs";
 import { PHOTON_GROUPS, photonPacing, photonToElement } from "../src/lib/places-fallback";
 import { parseQuery, applyFilters, defaultFilters, loadRangeKm, editDistance, fixTypos, matchesText, relaxFilters } from "../src/lib/search";
 import { demoActivities } from "../src/lib/demo-data";
+import {
+  commonsThumb, isPhotoFile, loadAreaPhotos, loadPlaceMedia, matchStrength, matchPlacesToItems, nameVariants, plainText, thumbSrcSet, wikiRefFromTags, withAreaPhotos,
+  type WikiItem,
+} from "../src/lib/wiki";
+import type { Activity } from "../src/lib/types";
 
 // Hours
 const h = parseOsmHours("Mo-Fr 08:00-18:00; Sa 09:00-17:00; Su off")!;
@@ -237,10 +242,159 @@ async function fallbackTests() {
   }
 }
 
-fallbackTests().then(
-  () => console.log("all logic tests passed"),
-  (e) => {
-    console.error(e);
-    process.exit(1);
-  },
+// ---- Wikimedia photos and descriptions ---------------------------------------------------------
+
+// OpenStreetMap tags → links. Only Commons files are accepted as images, never other hosts.
+assert.deepEqual(wikiRefFromTags({ wikipedia: "fr:Musée_de_la_ville_de_Bruxelles", wikidata: "Q968055" }), {
+  wikipedia: { lang: "fr", title: "Musée de la ville de Bruxelles" },
+  wikidata: "Q968055",
+});
+assert.deepEqual(wikiRefFromTags({ wikimedia_commons: "Category:British Museum", image: "File:British Museum from NE 2.JPG" }), {
+  commonsCategory: "British Museum",
+  commonsFile: "British Museum from NE 2.JPG",
+});
+assert.equal(wikiRefFromTags({ image: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3a/British_Museum_from_NE_2.JPG/500px-British_Museum_from_NE_2.JPG" })?.commonsFile, "British Museum from NE 2.JPG");
+assert.equal(wikiRefFromTags({ image: "https://commons.wikimedia.org/wiki/File:Caf%C3%A9_X.jpg" })?.commonsFile, "Café X.jpg");
+assert.equal(wikiRefFromTags({ image: "https://example.com/photo.jpg", wikidata: "not-an-id" }), undefined, "other hosts and bad ids are ignored");
+assert.equal(elementToActivity({ type: "node", id: 3, lat: 1, lon: 1, tags: { tourism: "museum", name: "M", wikidata: "Q1;Q2" } })!.wiki?.wikidata, "Q1");
+assert.equal(elementToActivity({ type: "node", id: 3, lat: 1, lon: 1, tags: { tourism: "museum", name: "M" } })!.wiki, undefined);
+
+// Photographs only, at the widths Wikimedia serves
+assert.ok(isPhotoFile("Broodhuis Bruxelles.jpg") && isPhotoFile("x.JPEG") && !isPhotoFile("Bupa-logo 2022.png") && !isPhotoFile("map.svg"));
+assert.equal(commonsThumb("Café X.jpg", 500), "https://commons.wikimedia.org/wiki/Special:FilePath/Caf%C3%A9_X.jpg?width=500");
+assert.equal(thumbSrcSet(commonsThumb("a b.jpg", 500)), "https://commons.wikimedia.org/wiki/Special:FilePath/a_b.jpg?width=330 330w, https://commons.wikimedia.org/wiki/Special:FilePath/a_b.jpg?width=500 500w");
+assert.ok(thumbSrcSet(commonsThumb("a.jpg", 960), true)!.endsWith("width=960 960w"));
+assert.equal(thumbSrcSet("data:image/png;base64,xx"), undefined, "a venue's own upload is left alone");
+assert.equal(plainText('<a href="//commons.wikimedia.org/wiki/User:X">Jane &amp; Co</a>'), "Jane & Co");
+
+// Bilingual OpenStreetMap names count as two names; one short word is not a name
+assert.deepEqual(nameVariants("Musée de la ville de Bruxelles - Museum van de Stad Brussel").map((v) => v.join(" ")), [
+  "musee ville bruxelles museum stad brussel",
+  "musee ville bruxelles",
+  "museum stad brussel",
+]);
+assert.deepEqual(nameVariants("Parc"), []);
+
+// Matching a nearby Wikidata item to a place: same name, close by, and the same kind of thing
+const spot = (name: string, category: Activity["category"], lat = 50.8467, lng = 4.3525) => ({ id: `osm-node-${name}`, name, category, lat, lng }) as Activity;
+const item = (id: string, names: string[], desc: string | undefined, lat = 50.8468, lng = 4.3526): WikiItem => ({ id, lat, lng, names, desc });
+const cityMuseum = item("Q968055", ["Brussels City Museum", "Musée de la ville de Bruxelles", "Museum van de Stad Brussel"], "museum in Brussels, Belgium");
+assert.equal(matchStrength(spot("Musée de la ville de Bruxelles - Museum van de Stad Brussel", "museum"), cityMuseum), "exact");
+assert.equal(matchStrength(spot("Musée Magritte Museum", "museum"), item("Q1", ["Musée Magritte", "Magritte Museum"], "art museum in Brussels")), "close", "a bilingual name written without a separator");
+assert.equal(matchStrength(spot("Museum van de Stad Brussel", "museum", 50.86, 4.3525), cityMuseum), null, "over a kilometre away");
+assert.equal(matchStrength(spot("Museum van de Stad Brussel", "museum"), { ...cityMuseum, desc: undefined }), null, "no description, no match");
+// The cases that would put the wrong picture on a real business
+const statue = item("Q2", ["Manneken Pis"], "sculpture and fountain in Brussels, Belgium");
+assert.equal(matchStrength(spot("Manneken Pis", "museum"), statue), "exact", "the attraction itself");
+assert.equal(matchStrength(spot("Manneken Pis", "indiecafe"), statue), null, "a café named after the statue next door");
+assert.equal(matchStrength(spot("Le Cirio", "indiecafe"), item("Q3", ["Le Cirio"], "café in Brussels, Belgium")), "exact");
+assert.equal(matchStrength(spot("Théâtre Royal du Parc", "live"), item("Q4", ["Parc Royal", "Brussels Park"], "park in Brussels, Belgium")), null, "a theatre is not the park it stands in");
+assert.equal(matchStrength(spot("Parc", "park"), item("Q5", ["Parc", "Park"], "metro station in Brussels")), null, "a station is never a venue");
+assert.equal(matchStrength(spot("Atomium", "walk"), item("Q5b", ["Atomium"], "building in Brussels")), "exact", "a distinctive single word");
+assert.equal(matchStrength(spot("Palace", "walk"), item("Q5c", ["Palace"], "building in Brussels")), null, "one short word with no way to check the kind");
+assert.equal(matchStrength(spot("Botanique", "park"), item("Q6", ["Botanique"], "Brussels metro station")), null);
+assert.equal(matchStrength(spot("Starbucks", "chaincafe"), item("Q7", ["Starbucks"], "American coffeehouse chain")), null, "chains never get a photo this way");
+assert.equal(matchStrength(spot("Parc de Bruxelles", "park", 50.8445, 4.3635), item("Q8", ["Parc de Bruxelles"], "park in Brussels", 50.8449, 4.3672)), "exact", "parks may be a few hundred metres off");
+// Exact names beat close ones, then the nearest wins
+assert.deepEqual(
+  matchPlacesToItems(
+    [spot("Musée Magritte Museum", "museum")],
+    [item("Q10", ["Magritte Museum Shop Museum"], "museum shop"), item("Q11", ["Musée Magritte", "Magritte Museum"], "art museum", 50.847, 4.353), item("Q12", ["Musée Magritte Museum"], "art museum", 50.8475, 4.3535)],
+  ),
+  { "osm-node-Musée Magritte Museum": "Q12" },
 );
+
+async function wikiTests() {
+  const realFetch = globalThis.fetch;
+  const calls: string[] = [];
+  const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
+  const param = (url: string, k: string) => new URL(url).searchParams.get(k) ?? "";
+  try {
+    // Area photos: a linked place needs no guessing; an unlinked one is matched by name; a logo is never used
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      const url = String(input);
+      calls.push(url);
+      if (param(url, "generator") === "search")
+        return json({ query: { pages: [{ title: "Q968055", coordinates: [{ lat: 50.8468, lon: 4.3526 }] }, { title: "Q99", coordinates: [{ lat: 50.9, lon: 4.5 }] }, { title: "Q50", coordinates: [{ lat: 50.8467, lon: 4.3524 }] }] } });
+      if (param(url, "action") === "wbgetentities")
+        return json({ entities: {
+          Q968055: { id: "Q968055", labels: { fr: { value: "Musée de la ville de Bruxelles" } }, aliases: { nl: [{ value: "Museum van de Stad Brussel" }] }, descriptions: { en: { value: "museum in Brussels, Belgium" } } },
+          Q50: { id: "Q50", labels: { en: { value: "Grand-Place" } }, descriptions: { en: { value: "central square of Brussels" } } },
+        } });
+      if (param(url, "prop") === "pageimages")
+        return json({ query: { pages: [{ title: "Q968055", pageimage: "Broodhuis_Bruxelles.jpg" }, { title: "Q777", pageimage: "Logo.png" }, { title: "Q888", pageimage: "Theatre front.jpg" }] } });
+      return json({}, 500);
+    }) as typeof fetch;
+    const places = [
+      spot("Museum van de Stad Brussel", "museum"),
+      { ...spot("Some Theatre", "live"), wiki: { wikidata: "Q888" } },
+      { ...spot("Logo Place", "museum"), wiki: { wikidata: "Q777" } },
+      spot("Grand Place Coffee", "indiecafe"),
+      spot("Starbucks", "chaincafe"),
+    ];
+    const photos = await loadAreaPhotos(places, { lat: 50.8467, lng: 4.3525 }, 5);
+    assert.deepEqual(photos, { "osm-node-Museum van de Stad Brussel": { file: "Broodhuis Bruxelles.jpg" }, "osm-node-Some Theatre": { file: "Theatre front.jpg" } });
+    assert.ok(calls.filter((u) => param(u, "generator") === "search").every((u) => param(u, "gsrsearch").startsWith("nearcoord:5km,50.8467,4.3525 haswbstatement:P18")));
+    assert.ok(!param(calls.find((u) => param(u, "action") === "wbgetentities")!, "ids").includes("Q99"), "names are only looked up for items near a place");
+    const shown = withAreaPhotos(places, photos);
+    assert.equal(shown[0].photos?.[0], commonsThumb("Broodhuis Bruxelles.jpg", 500));
+    assert.equal(shown[0].photoCredits?.[0]?.page, "https://commons.wikimedia.org/wiki/File:Broodhuis_Bruxelles.jpg");
+    assert.equal(shown[3].photos, undefined);
+    assert.equal(withAreaPhotos([{ ...places[0], photos: ["own.jpg"] }], photos)[0].photos?.[0], "own.jpg", "a venue's own photo is kept");
+
+    // Everything down: no photos, and no exception that could disturb the page
+    globalThis.fetch = (async () => json({}, 503)) as typeof fetch;
+    await assert.rejects(loadAreaPhotos([spot("Elsewhere Museum", "museum")], { lat: 1, lng: 1 }, 5));
+    assert.deepEqual(await loadPlaceMedia({ wikidata: "Q1", wikipedia: { lang: "fr", title: "X" } }, ["en"]), { text: undefined, photos: [] });
+
+    // Place page: article in the visitor's language, Wikidata's picture first, gallery from the place's own category
+    calls.length = 0;
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      const url = String(input);
+      calls.push(url);
+      if (param(url, "props") === "sitelinks")
+        return json({ entities: { Q968055: { sitelinks: { frwiki: { title: "Musée de la ville de Bruxelles" }, nlwiki: { title: "Museum van de Stad Brussel" }, enwiki: { title: "Brussels City Museum" }, commonswiki: { title: "Category:Museum of the City of Brussels" } } } } });
+      if (url.includes("/api/rest_v1/page/summary/"))
+        return json({ type: "standard", title: "Museum van de Stad Brussel", extract: "Het Museum van de Stad Brussel is een museum.", originalimage: { source: "https://upload.wikimedia.org/wikipedia/commons/8/8f/Other.jpg" }, content_urls: { desktop: { page: "https://nl.wikipedia.org/wiki/Museum_van_de_Stad_Brussel" } } });
+      if (param(url, "action") === "wbgetclaims") return json({ claims: { P18: [{ mainsnak: { datavalue: { value: "Broodhuis Bruxelles.jpg" } } }] } });
+      if (param(url, "generator") === "categorymembers")
+        return json({ query: { pages: [
+          { title: "File:Broodhuis Bruxelles.jpg", imageinfo: [{ width: 1924, height: 2560 }] },
+          { title: "File:Hall.jpg", imageinfo: [{ width: 2000, height: 1500, extmetadata: { Artist: { value: "<a>Ann</a>" }, LicenseShortName: { value: "CC BY 4.0" } } }] },
+          { title: "File:Plan.svg", imageinfo: [{ width: 2000, height: 1500 }] },
+          { title: "File:Tiny.jpg", imageinfo: [{ width: 300, height: 200 }] },
+          { title: "File:Banner.jpg", imageinfo: [{ width: 4000, height: 600 }] },
+        ] } });
+      if (param(url, "titles") === "File:Broodhuis Bruxelles.jpg")
+        return json({ query: { pages: [{ title: "File:Broodhuis Bruxelles.jpg", imageinfo: [{ extmetadata: { Artist: { value: "Ben" }, LicenseShortName: { value: "CC BY-SA 3.0" } } }] }] } });
+      return json({}, 500);
+    }) as typeof fetch;
+    const media = await loadPlaceMedia({ wikidata: "Q968055", wikipedia: { lang: "fr", title: "Musée de la ville de Bruxelles" } }, ["nl", "en"]);
+    assert.equal(media.text?.lang, "nl");
+    assert.equal(media.text?.url, "https://nl.wikipedia.org/wiki/Museum_van_de_Stad_Brussel");
+    assert.ok(calls.some((u) => u.startsWith("https://nl.wikipedia.org/api/rest_v1/page/summary/Museum_van_de_Stad_Brussel")));
+    assert.deepEqual(media.photos.map((p) => p.src), [commonsThumb("Broodhuis Bruxelles.jpg", 960), commonsThumb("Hall.jpg", 960)], "hero once, then gallery photos that are real photos of a sensible shape");
+    assert.deepEqual(media.photos[0].credit, { page: "https://commons.wikimedia.org/wiki/File:Broodhuis_Bruxelles.jpg", by: "Ben", license: "CC BY-SA 3.0" });
+    assert.deepEqual(media.photos[1].credit, { page: "https://commons.wikimedia.org/wiki/File:Hall.jpg", by: "Ann", license: "CC BY 4.0" });
+
+    // A disambiguation page is not a description, and a picture hosted outside Commons is not used
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/page/summary/")) return json({ type: "disambiguation", extract: "X may refer to", originalimage: { source: "https://upload.wikimedia.org/wikipedia/en/1/11/Nonfree.jpg" }, content_urls: { desktop: { page: "https://en.wikipedia.org/wiki/X" } } });
+      return json({ query: { pages: [] } });
+    }) as typeof fetch;
+    assert.deepEqual(await loadPlaceMedia({ wikipedia: { lang: "en", title: "X" } }, ["en"]), { text: undefined, photos: [] });
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+}
+
+fallbackTests()
+  .then(wikiTests)
+  .then(
+    () => console.log("all logic tests passed"),
+    (e) => {
+      console.error(e);
+      process.exit(1);
+    },
+  );
