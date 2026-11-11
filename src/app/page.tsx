@@ -110,7 +110,8 @@ export default function Home() {
   const deals = near.filter((a) => a.deal);
   const collage = SHOW_DEMO
     ? (["pixel-cellar", "lost-umbrellas", "slow-clay", "paper-moon"].map((id) => activities.find((a) => a.id === id)).filter(Boolean) as Activity[])
-    : [...unusual, ...real.filter((a) => !unusual.includes(a))].slice(0, 4);
+    : // Places with a real photo first: the collage is the first thing a visitor sees.
+      [...unusual, ...real.filter((a) => !unusual.includes(a))].sort((a, b) => Number(Boolean(b.photos?.length)) - Number(Boolean(a.photos?.length))).slice(0, 4);
   // Moods and example searches that would come back empty for this area aren't offered.
   const moods = loading ? MOODS : MOODS.filter((m) => applyFilters(near, { ...defaultFilters(), ...m.filters }, place).length > 0);
 

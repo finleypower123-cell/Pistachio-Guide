@@ -179,6 +179,13 @@ assert.equal(photonToElement({ properties: { osm_id: 1, osm_type: "N", osm_key: 
   assert.deepEqual(parseQuery("a park for a picnic").filters.categories, ["park"]);
 }
 
+// ---- places with a real photo come first among otherwise equal places ----
+{
+  const m = (id: number, photo: boolean) => ({ ...elementToActivity({ type: "node", id, lat: 1, lon: 1, tags: { tourism: "museum", name: "M" + id } })!, ...(photo ? { photos: ["https://upload.wikimedia.org/x.jpg"] } : {}) });
+  const order = applyFilters([m(1, false), m(2, true), m(3, false)], defaultFilters(), { label: "x", lat: 1, lng: 1 }).map((a) => a.name);
+  assert.equal(order[0], "M2");
+}
+
 // ---- friendly descriptions ----
 {
   const cafe = elementToActivity({ type: "node", id: 42, lat: 1, lon: 1, tags: { amenity: "cafe", name: "Bean There" } })!;
