@@ -39,6 +39,11 @@ export function buildAroundQuery(lat: number, lng: number, radiusM: number, limi
   nwr${a}["tourism"~"^(museum|gallery|attraction|viewpoint)$"]["name"];
   nwr${a}["shop"~"^(second_hand|charity|games)$"]["name"];
   nwr${a}["sport"="climbing"]["name"];
+  nwr${a}["tourism"~"^(zoo|aquarium|theme_park)$"]["name"];
+  nwr${a}["leisure"~"^(ice_rink|indoor_play|nature_reserve)$"]["name"];
+  nwr${a}["amenity"~"^(planetarium|karaoke_box|boat_rental|music_venue)$"]["name"];
+  nwr${a}["historic"~"^(castle|ruins)$"]["name"];
+  nwr${a}["craft"="brewery"]["name"];
 );
 out center tags ${limit};`;
 }
@@ -80,6 +85,12 @@ function classify(t: Record<string, string>): Mapped | null {
       return { category: "trampoline", typeLabel: "Trampoline park" };
     case "swimming_pool":
       return { category: "swim", typeLabel: "Swimming pool" };
+    case "ice_rink":
+      return { category: "icerink", typeLabel: "Ice rink" };
+    case "indoor_play":
+      return { category: "softplay", typeLabel: "Indoor play centre" };
+    case "nature_reserve":
+      return { category: "walk", typeLabel: "Nature reserve" };
     case "sports_centre": {
       // The sport tag says what a centre is for. Basic records don't carry it, so a name that
       // plainly says "pool" or "climbing" (in English, French, Dutch or German) counts too.
@@ -105,6 +116,14 @@ function classify(t: Record<string, string>): Mapped | null {
       return { category: "art", typeLabel: "Arts centre" };
     case "marketplace":
       return { category: "market", typeLabel: "Market" };
+    case "planetarium":
+      return { category: "museum", typeLabel: "Planetarium" };
+    case "karaoke_box":
+      return { category: "karaoke", typeLabel: "Karaoke" };
+    case "boat_rental":
+      return { category: "boats", typeLabel: "Boat hire" };
+    case "music_venue":
+      return { category: "live", typeLabel: "Music venue" };
   }
   switch (t.tourism) {
     case "museum":
@@ -115,7 +134,20 @@ function classify(t: Record<string, string>): Mapped | null {
       return { category: "museum", typeLabel: "Local attraction" };
     case "viewpoint":
       return { category: "walk", typeLabel: "Viewpoint" };
+    case "zoo":
+      return { category: "zoo", typeLabel: "Zoo" };
+    case "aquarium":
+      return { category: "zoo", typeLabel: "Aquarium" };
+    case "theme_park":
+      return { category: "themepark", typeLabel: "Theme park" };
   }
+  switch (t.historic) {
+    case "castle":
+      return { category: "historic", typeLabel: "Castle" };
+    case "ruins":
+      return { category: "historic", typeLabel: "Ruins" };
+  }
+  if (t.craft === "brewery") return { category: "brewery", typeLabel: "Brewery" };
   switch (t.shop) {
     case "second_hand":
     case "charity":

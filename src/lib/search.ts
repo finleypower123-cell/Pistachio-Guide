@@ -52,7 +52,7 @@ export function availableDetails(list: Activity[]) {
  * Kinds of place that count as "unusual" on their own (an escape room, crazy golf), so the
  * "something different" filter works for real places, which carry no hand-picked "weird" label.
  */
-const EXPERIENCES = new Set<CategoryId>(["escape", "arcade", "boardgame", "golf", "trampoline", "climbing", "water"]);
+const EXPERIENCES = new Set<CategoryId>(["escape", "arcade", "boardgame", "golf", "trampoline", "climbing", "water", "themepark", "icerink", "karaoke", "zoo"]);
 
 // A shop that sells games shares the board-game café category but is not an outing in itself.
 const hasTag = (a: Activity, t: Tag) => a.tags.includes(t) || (t === "weird" && EXPERIENCES.has(a.category) && a.typeLabel !== "Games shop");
@@ -247,6 +247,15 @@ const CAT_WORDS: [RegExp, CategoryId[]][] = [
   [/\b(workshops?|make something|class|pottery|craft)\b/, ["workshop", "art"]],
   [/\b(food|eat|dinner|tasting|dumplings?)\b/, ["food"]],
   [/\b(music|gig|comedy|show|live|theatres?|theaters?)\b/, ["live"]],
+  [/\b(zoos?|aquariums?|animals?|dierentuin|tierpark)\b/, ["zoo"]],
+  [/\b(theme ?parks?|amusement ?parks?|roller ?coasters?|rides|pretpark|parc d'attractions|freizeitpark)\b/, ["themepark"]],
+  [/\b(ice ?(rinks?|skating)|skating|patinoire|schaatsbaan|eisbahn)\b/, ["icerink"]],
+  [/\bkaraoke\b/, ["karaoke"]],
+  [/\b(soft ?play|indoor play|play ?centres?|play ?centers?)\b/, ["softplay"]],
+  [/\b(boats?|boating|kayaks?|canoes?|pedalos?|rowing)\b/, ["boats"]],
+  [/\b(castles?|ruins|chateaux?|kasteel|schloss|burg)\b/, ["historic"]],
+  [/\b(brewer(y|ies)|taprooms?|beer|brasserie|brouwerij|brauerei)\b/, ["brewery"]],
+  [/\b(nature reserves?|wildlife)\b/, ["walk"]],
   [/\b(water ?park|slides)\b/, ["water"]],
 ];
 
@@ -265,7 +274,7 @@ const VOCAB = [
   "dinner", "music", "comedy", "theatre", "theater", "slides", "cheap", "rainy", "indoor", "outdoor", "outside",
   "inside", "romantic", "weird", "quirky", "unusual", "strange", "hidden", "secret", "independent", "family", "children",
   "friends", "tonight", "afternoon", "evening", "accessible", "wheelchair", "quick", "nearby", "piscine", "zwembad",
-  "bioscoop", "galerie", "jardin", "musee",
+  "bioscoop", "galerie", "jardin", "musee", "aquarium", "karaoke", "skating", "castle", "brewery", "kayak", "animals",
 ];
 
 /** Replaces near-miss spellings of words the search understands ("musuem" becomes "museum"). */
@@ -371,6 +380,8 @@ function parseExact(q: string): Parsed {
     understood.push("Up to 2 hours");
   }
   for (const [re, ids] of CAT_WORDS) if (re.test(s)) ids.forEach((c) => cats.add(c));
+  // "theme park", "water park" and "trampoline park" are their own thing, not a request for parks and gardens.
+  if ((cats.has("themepark") || cats.has("water") || cats.has("trampoline")) && !/\bparks?\b.*\bparks?\b/.test(s)) cats.delete("park");
   // "a quirky café" means an interesting independent one, not a literally weird attraction
   if (cats.size && tags.has("weird") && !/\bweird\b/.test(s)) {
     tags.delete("weird");

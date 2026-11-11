@@ -20,7 +20,15 @@ export type CategoryId =
   | "leisure"
   | "workshop"
   | "food"
-  | "live";
+  | "live"
+  | "zoo"
+  | "themepark"
+  | "icerink"
+  | "karaoke"
+  | "softplay"
+  | "boats"
+  | "historic"
+  | "brewery";
 
 export type Tag = "weird" | "gem" | "date" | "family" | "solo" | "friends" | "rainy";
 

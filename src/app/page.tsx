@@ -49,7 +49,7 @@ function Section({ title, sub, href, children, id }: { title: string; sub?: stri
 }
 
 /** Place types that make a less ordinary day out, used for the first rail and the hero collage. */
-const UNUSUAL_CATS: CategoryId[] = ["escape", "arcade", "boardgame", "bowling", "golf", "climbing", "trampoline", "water", "museum", "art", "market", "vintage"];
+const UNUSUAL_CATS: CategoryId[] = ["escape", "arcade", "boardgame", "bowling", "golf", "climbing", "trampoline", "water", "themepark", "icerink", "karaoke", "zoo", "boats", "historic", "museum", "art", "market", "vintage"];
 
 function Rail({ items }: { items: Activity[] }) {
   const { osmStatus, retryOsm } = useApp();

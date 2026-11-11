@@ -204,10 +204,18 @@ const KIND: Partial<Record<CategoryId, RegExp>> = {
   boardgame: /caf[eé]|\bbar\b|pub|game/i,
   food: /restaurant|caf[eé]|\bbar\b|pub|food|market|brasserie|bakery/i,
   vintage: /shop|store|boutique|market/i,
+  zoo: /zoo|aquarium|animal|wildlife|farm|menagerie|park/i,
+  themepark: /theme|amusement|attraction|park|fair/i,
+  icerink: /ice|rink|skating|arena/i,
+  karaoke: /karaoke|\bbar\b|club/i,
+  softplay: /play/i,
+  boats: /boat|marina|lake|canal|rowing/i,
+  historic: /castle|palace|ruin|fort|abbey|church|tower|manor|ch[aâ]teau|house|monument|heritage|remains|wall|temple|priory|chapel|building|site|gate/i,
+  brewery: /brew|beer|distill|pub\b/i,
 };
 
-/** Parks are large and mapped by their centre, so their coordinates can sit far apart. */
-export const maxDistanceKm = (c: CategoryId) => (c === "park" ? 0.7 : 0.25);
+/** Parks, zoos, theme parks and reserves are large and mapped by their centre, so their coordinates can sit far apart. */
+export const maxDistanceKm = (c: CategoryId) => (c === "park" || c === "zoo" || c === "themepark" || c === "walk" ? 0.7 : 0.25);
 
 const sameTokens = (a: string[], b: string[]) => a.length === b.length && a.every((t, i) => t === b[i]);
 
