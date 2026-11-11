@@ -42,8 +42,7 @@ export function ActivityCard({ a, className, compact = false, row = false }: { a
           {(SHOW_DEMO || a.source === "business") && <SourceBadge a={a} />}
         </div>
         <h3 className={cn("font-bold", row ? "text-[1.05rem] leading-snug sm:text-[1.15rem]" : "text-[1.15rem]")}>{a.name}</h3>
-        {!compact && !a.partial && <p className={cn("line-clamp-2 text-[14px] text-ink-soft", row && "max-sm:hidden")}>{a.summary}</p>}
-        {a.partial && a.address && <p className="line-clamp-1 text-[14px] text-ink-soft">{a.address}</p>}
+        {!compact && <p className={cn("text-[14px] leading-snug text-ink-soft", row ? "line-clamp-3 sm:line-clamp-2" : "line-clamp-2")}>{a.summary}</p>}
         <div className="mt-auto flex flex-wrap items-center gap-x-3 gap-y-0.5 pt-1 text-[13px] font-semibold text-ink-soft tabular">
           {a.rating != null && (
             <span className="inline-flex items-center gap-1 text-ink">

@@ -1,3 +1,4 @@
+import { blurbFor } from "./blurbs";
 import { CAT } from "./categories";
 import { parseOsmHours } from "./hours";
 import type { Activity, CategoryId, Tag } from "./types";
@@ -155,16 +156,16 @@ export function elementToActivity(el: OsmElement): Activity | null {
           ? "Not wheelchair accessible, according to OpenStreetMap."
           : "Accessibility isn't recorded in OpenStreetMap yet. Check with the venue.";
 
+  // The place's own description when OpenStreetMap has one; otherwise a line about this kind of place.
+  const id = `osm-${el.type}-${el.id}`;
   const where = t["addr:street"] ? ` on ${t["addr:street"]}` : "";
-  const summary = t.description
-    ? t.description.slice(0, 180)
-    : `${m.typeLabel}${where}.`;
+  const summary = t.description ? t.description.slice(0, 180) : (blurbFor(m.typeLabel, id) ?? `${m.typeLabel}${where}.`);
 
   const website = t.website ?? t["contact:website"];
   const hoursRaw = t.opening_hours;
 
   return {
-    id: `osm-${el.type}-${el.id}`,
+    id,
     source: "osm",
     name: t.name,
     category: m.category,

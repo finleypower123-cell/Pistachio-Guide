@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { parseOsmHours, isOpenAt } from "../src/lib/hours";
 import { elementToActivity, buildAroundQuery, elementsToPlaces } from "../src/lib/osm";
 import { loadNearbyPlaces, loadPlaceById, timing } from "../src/lib/discover";
+import { blurbFor } from "../src/lib/blurbs";
 import { PHOTON_GROUPS, photonPacing, photonToElement } from "../src/lib/places-fallback";
 import { parseQuery, applyFilters, defaultFilters, loadRangeKm, editDistance, fixTypos, matchesText, relaxFilters } from "../src/lib/search";
 import { demoActivities } from "../src/lib/demo-data";
@@ -126,6 +127,19 @@ assert.equal(photonToElement({ properties: { osm_id: 1, osm_type: "N", osm_key: 
   // Best match mixes kinds of place: the three cafés don't take the first three slots
   const best = applyFilters(real, defaultFilters(), centre).map((a) => a.category);
   assert.ok(new Set(best.slice(0, 3)).size >= 2, "top of the list is mixed: " + best.join(","));
+}
+
+// ---- friendly descriptions ----
+{
+  const cafe = elementToActivity({ type: "node", id: 42, lat: 1, lon: 1, tags: { amenity: "cafe", name: "Bean There" } })!;
+  assert.equal(cafe.summary, blurbFor("Independent café", "osm-node-42"), "a line about the kind of place when there is no description");
+  assert.equal(cafe.summary, elementToActivity({ type: "node", id: 42, lat: 1, lon: 1, tags: { amenity: "cafe", name: "Bean There" } })!.summary, "same line every time");
+  const own = elementToActivity({ type: "node", id: 43, lat: 1, lon: 1, tags: { amenity: "cafe", name: "X", description: "Cat café with twelve resident cats." } })!;
+  assert.equal(own.summary, "Cat café with twelve resident cats.", "the place's own description wins");
+  assert.equal(blurbFor("Something unknown", "osm-node-1"), null);
+  // The stock line is not searched: "coffee" in it must not turn a category search into a text match
+  assert.ok(!matchesText(cafe, "sweet") && !matchesText(cafe, "chair") && !matchesText(cafe, "people-watching"));
+  assert.ok(matchesText(own, "resident cats"), "a real description is searched");
 }
 
 // Real places: our API route first, then Photon straight from the browser

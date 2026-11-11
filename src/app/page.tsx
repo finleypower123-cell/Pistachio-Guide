@@ -209,11 +209,11 @@ export default function Home() {
         </div>
       </section>
 
-      <Section title="Not your usual day out." sub="Arcades, escape rooms, odd little museums and markets you walk past every day." href={SHOW_DEMO ? "/explore?tag=weird" : `/explore?cat=${UNUSUAL_CATS.join(",")}`}>
+      <Section title="A little bit weird, a lot of fun." sub="Arcades, escape rooms, odd little museums and markets you walk past every day." href={SHOW_DEMO ? "/explore?tag=weird" : `/explore?cat=${UNUSUAL_CATS.join(",")}`}>
         <Rail items={unusual} />
       </Section>
 
-      <Section title="Explore by mood" sub="Pick how you feel. We'll handle the rest.">
+      <Section title="Fancy doing something different?" sub="Pick how you feel. We'll handle the rest.">
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
           {moods.map((m, i) => (
             <Link key={m.id} href={`/explore?mood=${m.id}`} className={`group flex items-center gap-3 overflow-hidden rounded-[22px] p-3 transition hover:-translate-y-0.5 ${i % 3 === 0 ? "bg-accent text-forest" : i % 3 === 1 ? "bg-surface shadow-card" : "bg-forest text-cream"}`}>
@@ -229,11 +229,11 @@ export default function Home() {
         </div>
       </Section>
 
-      <Section title="Free things to do" sub="Activities that cost nothing at all." href="/explore?price=free">
+      <Section title="Get off the sofa. It's free." sub="Good times that cost nothing at all." href="/explore?price=free">
         <Rail items={free} />
       </Section>
 
-      <Section title={SHOW_DEMO ? "Real places near you" : "Near you"} sub={`Cafés, parks, pools and venues around ${place.label}, straight from OpenStreetMap.`} href="/explore?sort=nearest">
+      <Section title={SHOW_DEMO ? "Real places near you" : "Things you didn't know were around the corner"} sub={`Cafés, parks, pools and venues around ${place.label}.`} href="/explore?sort=nearest">
         {osmStatus === "off" ? (
           <p className="rounded-2xl bg-osm-bg p-5 text-osm-ink">This is a preview with demo listings. In the full app, this row fills with real cafés, parks, pools and venues from OpenStreetMap.</p>
         ) : (
@@ -261,7 +261,7 @@ export default function Home() {
         <Rail items={rainy} />
       </Section>
 
-      <Section title="Little local gems" sub="Independent cafés, hidden venues and one-of-a-kind shops." href="/explore?tag=gem">
+      <Section title="Hidden gems worth finding" sub="Independent cafés, small venues and one-of-a-kind shops." href="/explore?tag=gem">
         <Rail items={gems} />
       </Section>
 
