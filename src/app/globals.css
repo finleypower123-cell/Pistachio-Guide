@@ -128,6 +128,18 @@ body {
   font-size: 16px;
   line-height: 1.55;
 }
+/* Every button gives a little when pressed, so a tap always feels acknowledged. In the base layer
+   so that a component's own utility classes still win. */
+@layer base {
+  button:not(:disabled),
+  a[class*="rounded-full"] {
+    transition: transform 0.12s ease, background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, color 0.15s ease;
+  }
+  button:not(:disabled):active,
+  a[class*="rounded-full"]:active {
+    transform: scale(0.96);
+  }
+}
 h1, h2, h3 {
   font-family: var(--font-display);
   text-wrap: balance;
@@ -180,6 +192,58 @@ h1, h2, h3 {
 }
 .animate-shake { animation: shake 0.5s ease-in-out 2; }
 .animate-pop { animation: pop 0.35s cubic-bezier(0.2, 0.9, 0.3, 1.2) both; }
+
+/* ---- Motion: small and quick, to confirm what just happened. All of it is switched off by the
+   reduced-motion rule at the end of this file. ---- */
+
+/* A new page fades in. Opacity only: a transform here would briefly misplace fixed children. */
+@keyframes page-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.animate-page { animation: page-in 0.22s ease-out both; }
+
+/* Cards in a list or row arrive one after another. */
+@keyframes rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+.stagger > * { animation: rise 0.4s cubic-bezier(0.2, 0.8, 0.3, 1) both; }
+.stagger > *:nth-child(2) { animation-delay: 40ms; }
+.stagger > *:nth-child(3) { animation-delay: 80ms; }
+.stagger > *:nth-child(4) { animation-delay: 120ms; }
+.stagger > *:nth-child(5) { animation-delay: 160ms; }
+.stagger > *:nth-child(6) { animation-delay: 200ms; }
+.stagger > *:nth-child(n + 7) { animation-delay: 240ms; }
+
+/* A chip or toggle that has just been switched on gives a small bounce; a saved heart beats once. */
+@keyframes chip-on {
+  0% { transform: scale(0.94); }
+  60% { transform: scale(1.04); }
+  100% { transform: none; }
+}
+@keyframes heart-beat {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.35); }
+  100% { transform: scale(1); }
+}
+[aria-pressed="true"]:not(.no-bounce) { animation: chip-on 0.22s ease-out; }
+[aria-pressed="true"] > svg.lucide-heart { animation: heart-beat 0.35s ease-out; }
+
+/* The picture on a tile leans a little when the tile is hovered or focused. */
+.tilt-on-hover:hover .tilt,
+.tilt-on-hover:focus-visible .tilt { animation: shake 0.5s ease-in-out 1; }
+
+/* Loading placeholders: a soft light sweeps across in place of a plain blink. */
+@keyframes shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+.skeleton {
+  background: linear-gradient(100deg, var(--surface-2) 30%, color-mix(in srgb, var(--surface-2) 55%, var(--surface)) 50%, var(--surface-2) 70%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s linear infinite;
+}
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
 }

@@ -272,7 +272,7 @@ export function ExploreView({ initialView = "list" }: { initialView?: "list" | "
           {view === "list" && results.length === 0 && (osmStatus === "loading" || osmStatus === "idle") ? (
             <div className="grid gap-3 sm:grid-cols-2 sm:gap-5 xl:grid-cols-3" aria-busy="true">
               {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="h-28 animate-pulse rounded-[22px] bg-surface-2 sm:h-[320px]" />
+                <div key={i} className="skeleton h-28 rounded-[22px] sm:h-[320px]" />
               ))}
             </div>
           ) : view === "list" && results.length === 0 && osmStatus === "error" && activities.length === 0 ? (
@@ -331,7 +331,7 @@ export function ExploreView({ initialView = "list" }: { initialView?: "list" | "
             </div>
           ) : view === "list" ? (
             <>
-              <div className="grid gap-3 sm:grid-cols-2 sm:gap-5 xl:grid-cols-3">
+              <div className="stagger grid gap-3 sm:grid-cols-2 sm:gap-5 xl:grid-cols-3">
                 {results.slice(0, visible).map((a) => (
                   <ActivityCard key={a.id} a={a} row />
                 ))}
