@@ -1,0 +1,42 @@
+name: Live check
+on:
+  push:
+    branches: [diag/wiki-check]
+permissions:
+  contents: write
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Probe
+        run: |
+          {
+            npm ci >/dev/null 2>&1
+            npm i --no-save name-suggestion-index >/dev/null 2>&1 && node scripts/build-chain-names.mjs
+            git diff --stat src/data
+            pip install -q overturemaps pyarrow 2>&1 | grep -v notice
+            npx tsx scripts/build-city-data.ts --list | python3 -c "import json,sys; d=[c for c in json.load(sys.stdin) if c['slug'] in ('brussels','london')]; json.dump(d,open('/tmp/cities.json','w'))"
+            python3 scripts/overture_places.py /tmp/cities.json .overture
+            npx tsx scripts/build-city-data.ts brussels london
+            node diag/summary.cjs
+          } > /tmp/out.txt 2>&1 || true
+          cat /tmp/out.txt
+          python3 - <<'PY'
+          import json
+          t=open('/tmp/out.txt').read()[-60000:]
+          json.dump({"body":"```\n"+t+"\n```"},open('/tmp/c.json','w'))
+          PY
+          gh api repos/${{ github.repository }}/commits/${{ github.sha }}/comments --input /tmp/c.json --jq .html_url
+          git config user.name diag; git config user.email diag@users.noreply.github.com
+          git add public/data/cities src/data && git commit -qm "diag output" && git push -q origin HEAD:diag/wiki-check || true
