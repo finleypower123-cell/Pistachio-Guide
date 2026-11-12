@@ -5,7 +5,7 @@ import { directThumb, md5 } from "../src/lib/wiki";
 import assert from "node:assert/strict";
 import { parseOsmHours, isOpenAt, openStatus, parseHoursLight, formatRanges, weekRows } from "../src/lib/hours";
 import { fullHours, ordinaryWeek } from "../src/lib/hours-full";
-import { firstSentences, metaDescription, usableSiteText, withDescriptions } from "../src/lib/enrich";
+import { firstSentences, metaDescription, usableSiteText, withDescriptions, withoutSalesPitch } from "../src/lib/enrich";
 import { cleanName, mergeOverture, overturePlaceById, overtureToActivity, sameName, streetOnly, type OverturePlace } from "../src/lib/overture";
 import { elementToActivity, buildAroundQuery, elementsToPlaces, isListedChain } from "../src/lib/osm";
 import { loadNearbyPlaces, loadPlaceById, timing } from "../src/lib/discover";
@@ -688,6 +688,7 @@ async function descriptionTests() {
   assert.equal(usableSiteText("Just another WordPress site with a longer tail of words here", "X"), false);
   assert.equal(usableSiteText("cafe, coffee, brussels, cake, tea, lunch, brunch, wifi, terrace, cheap, best", "X"), false);
   assert.equal(usableSiteText("A small neighbourhood café with good coffee and homemade cakes.", "X"), true);
+  assert.equal(withoutSalesPitch("7 rooms and physical challenges in the heart of Brussels. Book your tickets now!"), "7 rooms and physical challenges in the heart of Brussels.");
 
   // Wikipedia first, the venue's website otherwise; a text shared by two venues is a template and dropped
   const realFetch = globalThis.fetch;

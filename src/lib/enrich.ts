@@ -95,14 +95,27 @@ export function usableSiteText(text: string, placeName: string): boolean {
   return text.toLowerCase().replace(/[^a-z]/g, "") !== placeName.toLowerCase().replace(/[^a-z]/g, "");
 }
 
+/** Drops "Book now!"-style sentences, keeping the ones that say what the place is. */
+export function withoutSalesPitch(text: string): string {
+  const PITCH = /^(book|reserve|buy|order|sign up|subscribe|get in touch|contact us|find (a|your)|discover more|learn more|réservez|commandez|inscrivez|boek|bestel|reserveer)\b|\b(book (your|now|online|tickets)|réservez (vos|votre|dès|maintenant)|en ligne maintenant)\b/i;
+  const parts = text.split(/(?<=[.!?])\s+/);
+  const kept = parts.filter((p) => !PITCH.test(p.trim()));
+  return (kept.length ? kept : parts).join(" ").trim();
+}
+
 async function siteDescription(url: string, name: string): Promise<PlaceDescription | null> {
   if (/facebook\.com|instagram\.com|linktr\.ee|google\.[a-z.]+\/maps/i.test(url)) return null;
   try {
     const res = await fetchWithTimeout(url, 7000, { headers: { Accept: "text/html", "Accept-Language": "en,fr;q=0.8,nl;q=0.7" } });
     if (!res.ok || !(res.headers.get("content-type") ?? "").includes("html")) return null;
+    // A site that now redirects to another business (a rebrand, a parked domain) isn't this place's.
+    const host = (u: string) => new URL(u).hostname.replace(/^www\./, "");
+    if (res.url && host(res.url) !== host(url)) return null;
     const meta = metaDescription((await res.text()).slice(0, 300_000));
-    if (!meta || !usableSiteText(meta.text, name)) return null;
-    return { text: firstSentences(meta.text, 320), lang: meta.lang, source: "website", url: res.url || url };
+    if (!meta) return null;
+    const text = withoutSalesPitch(meta.text);
+    if (!usableSiteText(text, name)) return null;
+    return { text: firstSentences(text, 320), lang: meta.lang, source: "website", url: res.url || url };
   } catch {
     return null;
   }
@@ -113,7 +126,8 @@ async function wikiDescription(a: Activity): Promise<PlaceDescription | null> {
   try {
     const media = await loadPlaceMedia(a.wiki, ["en"]);
     const t = media.text;
-    if (!t || t.text.length < 40) return null;
+    // English, or one of Belgium's languages; an article only in, say, German isn't much use here.
+    if (!t || t.text.length < 40 || !["en", "fr", "nl"].includes(t.lang)) return null;
     return { text: firstSentences(t.text, 600), lang: t.lang, source: "wikipedia", url: t.url, title: t.title };
   } catch {
     return null;
@@ -151,10 +165,16 @@ export async function withDescriptions(places: Activity[]): Promise<{ places: Ac
 
 /** A ~12px-wide WebP of the photo as a data URL (a couple of hundred bytes), or undefined. */
 async function blurFor(photo: string): Promise<string | undefined> {
-  const small = directThumb(photo, 120);
+  // The card size, which Wikimedia has usually made already, so it comes back quickly.
+  const small = directThumb(photo, 330);
   if (!small) return undefined;
   try {
-    const res = await fetchWithTimeout(small, 8000);
+    let res = await fetchWithTimeout(small, 10000);
+    // Wikimedia slows down busy callers; wait and try once more.
+    if (res.status === 429 || res.status >= 500) {
+      await new Promise((r) => setTimeout(r, 3000));
+      res = await fetchWithTimeout(small, 10000);
+    }
     if (!res.ok) return undefined;
     const { default: sharp } = await import("sharp");
     const buf = await sharp(Buffer.from(await res.arrayBuffer()))
@@ -168,7 +188,7 @@ async function blurFor(photo: string): Promise<string | undefined> {
 }
 
 export async function withPhotoBlurs(places: Activity[]): Promise<{ places: Activity[]; blurred: number }> {
-  const blurs = await pool(places, 6, (a) => (a.photos?.[0] && !a.photoBlur ? blurFor(a.photos[0]) : Promise.resolve(a.photoBlur)));
+  const blurs = await pool(places, 2, (a) => (a.photos?.[0] && !a.photoBlur ? blurFor(a.photos[0]) : Promise.resolve(a.photoBlur)));
   let blurred = 0;
   const out = places.map((a, i) => {
     if (!blurs[i]) return a;
