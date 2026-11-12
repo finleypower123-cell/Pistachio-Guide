@@ -46,6 +46,21 @@ function weekFrom(oh: InstanceType<typeof OpeningHours>, from: Date): DayRanges 
   return days;
 }
 
+/**
+ * The rules for an ordinary week: public and school holiday rules are dropped ("PH off", "SH Mo-Fr
+ * 10:00-16:00") and "PH" is taken out of day lists ("Sa-Su,PH 10:00-17:00" becomes "Sa-Su ...").
+ * opening_hours.js has no holiday calendar for some countries, the UK included, and the usual week
+ * is what the app shows anyway.
+ */
+export function ordinaryWeek(raw: string): string {
+  return raw
+    .split(";")
+    .map((r) => r.trim())
+    .filter((r) => r && !/(^|\s)(PH|SH)(\s|$)/.test(r.replace(/^[A-Z][a-z]{2}(-[A-Z][a-z]{2})?:?\s*/, " ")))
+    .map((r) => r.replace(/,(PH|SH)\b/g, "").replace(/\b(PH|SH),/g, ""))
+    .join("; ");
+}
+
 const sig = (d: [number, number][]) => d.map((r) => r.join("-")).join(",");
 
 /**
@@ -56,18 +71,25 @@ const sig = (d: [number, number][]) => d.map((r) => r.join("-")).join(",");
  */
 export function fullHours(raw: string | undefined, lat: number, lng: number, now = new Date()): ParsedHours | null | undefined {
   if (!raw) return null;
+  const week = ordinaryWeek(raw);
+  if (!week) return null;
   let oh: InstanceType<typeof OpeningHours>;
   try {
-    oh = new OpeningHours(raw, { lat, lon: lng, address: { country_code: countryAt(lat, lng), state: "" } }, 0);
+    oh = new OpeningHours(week, { lat, lon: lng, address: { country_code: countryAt(lat, lng), state: "" } }, 0);
   } catch {
     return undefined;
   }
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const weeks: DayRanges[] = [];
   for (let w = 0; w < 5; w++) {
-    const week = weekFrom(oh, new Date(today.getTime() + w * 7 * DAY_MS));
-    if (!week) return null;
-    weeks.push(week);
+    let days: DayRanges | null;
+    try {
+      days = weekFrom(oh, new Date(today.getTime() + w * 7 * DAY_MS));
+    } catch {
+      return undefined;
+    }
+    if (!days) return null;
+    weeks.push(days);
   }
   const usual: DayRanges = [0, 1, 2, 3, 4, 5, 6].map((d) => {
     const seen = new Map<string, { ranges: [number, number][]; n: number }>();

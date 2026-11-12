@@ -9,7 +9,14 @@ Pistachio Guide reuses code from these MIT-licensed projects. Their licence text
 | [TRIP](https://github.com/itskovacs/TRIP) | OpenStreetMap tag → category mapping, ported from Python to TypeScript | `src/lib/osm.ts` |
 | [nextjs-maplibre-starter](https://github.com/wellywahyudi/nextjs-maplibre-starter) | Reference for free OpenFreeMap tile styles and geolocation flow (no code copied verbatim) | `src/components/map/discovery-map.tsx` |
 
-Data and services: map data © OpenStreetMap contributors (ODbL), Overpass API, Nominatim, OpenFreeMap tiles, Open-Meteo weather. Photos from Wikimedia Commons (each under its own licence, linked where shown), descriptions from Wikipedia (CC BY-SA 4.0), both found through Wikidata (CC0).
+Libraries and lists used as published, without changes:
+
+| Project | Licence | What we use |
+| --- | --- | --- |
+| [opening_hours.js](https://github.com/opening-hours/opening_hours.js) | LGPL-3.0 | Reading OpenStreetMap opening hours, on the server and in the city build only (`src/lib/hours-full.ts`) |
+| [Name Suggestion Index](https://github.com/osmlab/name-suggestion-index) | BSD-3-Clause | Chain and brand names, saved as `src/data/chain-names.json` by `scripts/build-chain-names.mjs` |
+
+Data and services: map data © OpenStreetMap contributors (ODbL), places from [Overture Maps](https://overturemaps.org) (CDLA Permissive 2.0 and Apache 2.0, combining data from Meta, Microsoft, Foursquare, AllThePlaces and others; the city files in `public/data/cities` combine both sources and are shared under the ODbL), Overpass API, Nominatim, OpenFreeMap tiles, Open-Meteo weather. Photos from Wikimedia Commons (each under its own licence, linked where shown), descriptions from Wikipedia (CC BY-SA 4.0), both found through Wikidata (CC0).
 
 ---
 

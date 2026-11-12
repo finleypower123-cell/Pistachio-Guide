@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import { directThumb, md5 } from "../src/lib/wiki";
 import assert from "node:assert/strict";
 import { parseOsmHours, isOpenAt, openStatus, parseHoursLight, formatRanges, weekRows } from "../src/lib/hours";
-import { fullHours } from "../src/lib/hours-full";
+import { fullHours, ordinaryWeek } from "../src/lib/hours-full";
 import { cleanName, mergeOverture, overturePlaceById, overtureToActivity, sameName, streetOnly, type OverturePlace } from "../src/lib/overture";
 import { elementToActivity, buildAroundQuery, elementsToPlaces, isListedChain } from "../src/lib/osm";
 import { loadNearbyPlaces, loadPlaceById, timing } from "../src/lib/discover";
@@ -579,6 +579,11 @@ async function wikiTests() {
   // Public holidays don't close that weekday for good: 25 Dec and 1 Jan 2027 are both Fridays
   assert.deepEqual(fullHours("Mo-Su 09:00-17:00; PH off", 50.85, 4.35, new Date(2026, 11, 20))!.hours[5], [9, 17]);
   assert.deepEqual(fullHours("Mo-Su 09:00-17:00; PH off", 50.85, 4.35, new Date(2026, 10, 8))!.hours[3], [9, 17], "11 November");
+  // Holiday rules don't need a holiday calendar (there's none for the UK)
+  assert.equal(ordinaryWeek("Mo off; Tu-Su,PH 10:00-17:00"), "Mo off; Tu-Su 10:00-17:00");
+  assert.equal(ordinaryWeek("Oct-Mar Mo-Sa 12:00-18:00; Oct-Mar SH Mo-Fr 12:00-18:00; PH off"), "Oct-Mar Mo-Sa 12:00-18:00");
+  assert.equal(ordinaryWeek("Mo-We off; Th-Fr 16:00-22:00; PH unknown"), "Mo-We off; Th-Fr 16:00-22:00");
+  assert.deepEqual(fullHours("Mo-Fr 10:00-18:00; Sa-Su,PH 11:00-21:00", 51.5, -0.1, when)!.hours[0], [11, 21]);
   // Sentences
   assert.equal(hoursSentence(lunch.hours, lunch.detail), "Opening hours vary through the week; see below.");
   const split = fullHours("Mo-Su 08:00-12:00,14:00-18:00", 50.85, 4.35, when)!;
@@ -636,6 +641,8 @@ async function wikiTests() {
   assert.equal(a.about, "Au Grain is an independent café on Bd Sylvain Dupuis, Anderlecht. A locally run café for coffee and something to eat.");
   assert.equal(a.hours, null, "Overture has no hours, so none are made up");
   assert.equal(overtureToActivity(ovt({ name: "Starbucks" }), "brussels")!.category, "chaincafe");
+  assert.equal(overtureToActivity(ovt({ name: "Kafei", brand: "Kafei" }), "brussels")!.category, "indiecafe", "a bare brand name isn't a chain");
+  assert.equal(overtureToActivity(ovt({ name: "Shop & Go Mettewie" }), "brussels"), null);
   assert.equal(overtureToActivity(ovt({ primary: "dentist" }), "brussels"), null);
 
   const osm: Activity = { ...elementToActivity({ type: "node", id: 9, lat: 50.8467, lng: 4.3525, lon: 4.3525, tags: { amenity: "cafe", name: "Café Floris" } } as never)! };
@@ -648,6 +655,8 @@ async function wikiTests() {
       ovt({ id: "22222222-2222-2222-2222-222222222222", name: "Kaffabar", lat: 50.84, lng: 4.34 }),
       // listed twice by Overture: added once
       ovt({ id: "33333333-3333-3333-3333-333333333333", name: "Kaffabar", lat: 50.84001, lng: 4.34001, confidence: 0.9 }),
+      // a chain: skipped
+      ovt({ id: "88888888-8888-8888-8888-888888888888", name: "Costa Coffee", lat: 50.835, lng: 4.335 }),
       // only in a company register: skipped
       ovt({ id: "44444444-4444-4444-4444-444444444444", name: "Atelier Noir", lat: 50.83, lng: 4.33, datasets: ["BrightQuery"] }),
       // low confidence, closed, or no way to contact: skipped

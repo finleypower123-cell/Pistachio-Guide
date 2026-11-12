@@ -36,7 +36,7 @@ export function SiteFooter() {
         </div>
       </div>
       <p className="gutter mx-auto max-w-7xl text-xs text-ink-soft">
-        Places marked OpenStreetMap are real, © OpenStreetMap contributors. Details can be out of date, so check with the venue before you go.
+        Real places from © OpenStreetMap contributors and Overture Maps. Details can be out of date, so check with the venue before you go.
       </p>
     </footer>
   );

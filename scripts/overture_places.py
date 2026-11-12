@@ -55,6 +55,7 @@ def slim(row):
     box = row.get("bbox") or {}
     addr = first(row.get("addresses")) or {}
     brand = (((row.get("brand") or {}).get("names") or {}).get("primary")) or None
+    brand_wikidata = (row.get("brand") or {}).get("wikidata") or None
     datasets = sorted({s.get("dataset") for s in (row.get("sources") or []) if s.get("dataset") and s.get("dataset") != "Overture"})
     return {
         "id": row["id"],
@@ -69,6 +70,7 @@ def slim(row):
         "socials": row.get("socials") or [],
         "phones": row.get("phones") or [],
         "brand": brand,
+        "brandWikidata": brand_wikidata,
         "street": addr.get("freeform") or None,
         "locality": addr.get("locality") or None,
         "postcode": addr.get("postcode") or None,

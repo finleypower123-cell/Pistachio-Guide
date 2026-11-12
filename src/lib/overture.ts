@@ -8,6 +8,7 @@
  * Only what Overture records is used. It has no opening hours, prices or reviews, so none are shown.
  * New places are added only when they look real and open: a high confidence score, no "closed"
  * status, a source other than a company register, and a website, social page or phone number.
+ * Chains aren't added; they are easy to find already and would crowd out the independents.
  */
 import { blurbFor, introSentence } from "./blurbs";
 import { CAT } from "./categories";
@@ -30,6 +31,8 @@ export interface OverturePlace {
   socials: string[];
   phones: string[];
   brand?: string | null;
+  /** Set when the brand is a known company on Wikidata, i.e. a real chain */
+  brandWikidata?: string | null;
   street?: string | null;
   locality?: string | null;
   postcode?: string | null;
@@ -138,15 +141,26 @@ function socialLinks(urls: string[]): Activity["links"] {
 
 const website = (o: OverturePlace) => o.websites.find((w) => /^https?:\/\//i.test(w) && !/facebook\.com|instagram\.com/i.test(w));
 
+/** Shops in petrol stations and supermarkets that Overture files as cafés. */
+const NOT_A_CAFE = /\b(shop ?& ?go|carrefour|delhaize|spar|shell|esso|texaco|q8|lukoil|tesco|sainsbury'?s|morrisons|asda|m&s|ikea)\b/i;
+
+/** A chain by the Name Suggestion Index, or by a brand Overture links to Wikidata. A bare brand name isn't enough. */
+function isChain(o: OverturePlace, name: string) {
+  const m = MAP[o.primary];
+  return Boolean(o.brandWikidata) || (m?.osm ? isListedChain({ [m.osm[0]]: m.osm[1], name }) : false);
+}
+
 /** An Overture place as an app listing, or null when it doesn't fit a section of the app. */
 export function overtureToActivity(o: OverturePlace, citySlug: string): Activity | null {
   const m = MAP[o.primary];
   const name = cleanName(o.name);
   if (!m || !name) return null;
-  const chain = Boolean(o.brand) || (m.osm ? isListedChain({ [m.osm[0]]: m.osm[1], name }) : false);
+  if (m.category === "indiecafe" && NOT_A_CAFE.test(name)) return null;
+  const chain = isChain(o, name);
   const { category, typeLabel } = (chain && CHAIN_LABEL[m.category]) || m;
   const street = streetOnly(o.street);
-  const line = [o.street?.split(",")[0]?.trim(), o.locality, o.postcode].filter(Boolean);
+  const first = o.street?.split(",")[0]?.trim();
+  const line = [first && /[a-z]/i.test(first) ? first : undefined, o.locality, o.postcode].filter(Boolean);
   const indoor = CAT[category].indoorDefault;
   const tags: Tag[] = [];
   if (indoor) tags.push("rainy");
@@ -254,7 +268,8 @@ export function mergeOverture(osm: Activity[], overture: OverturePlace[], citySl
     }
     if (!addable(o)) continue;
     const a = overtureToActivity(o, citySlug);
-    if (!a) continue;
+    // Chains are easy to find without us, and would crowd out the independents.
+    if (!a || a.category === "chaincafe" || isChain(o, a.name)) continue;
     // A listing of the same kind a few steps away is very likely the same place under another name.
     if (places.some((p) => p.category === a.category && near(p, a, 0.03))) continue;
     candidates.push({ o, a });
