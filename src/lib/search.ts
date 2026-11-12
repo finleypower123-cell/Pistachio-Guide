@@ -2,7 +2,7 @@ import { blurbFor } from "./blurbs";
 import { CAT } from "./categories";
 import { distanceKm } from "./geo";
 import { isOpenAt, nowHour } from "./hours";
-import type { Activity, CategoryId, Place, Prefs, Tag, Weather } from "./types";
+import { isOpenData, type Activity, type CategoryId, type Place, type Prefs, type Tag, type Weather } from "./types";
 
 export type OpenAt = "any" | "now" | "afternoon" | "evening";
 export type SortKey = "best" | "nearest" | "cheapest" | "rating";
@@ -154,7 +154,7 @@ const OPEN_HOUR: Record<Exclude<OpenAt, "any">, () => number> = {
 
 export function applyFilters(list: Activity[], f: Filters, center: Place, weather?: Weather | null) {
   const out = list.filter((a) => {
-    if (!f.sources[a.source === "osm" ? "osm" : "demo"]) return false;
+    if (!f.sources[isOpenData(a) ? "osm" : "demo"]) return false;
     if (f.categories.length && !f.categories.includes(a.category)) return false;
     if (f.tags.length && !f.tags.every((t) => hasTag(a, t))) return false;
     if (f.price === "free" && a.price !== 0) return false;
@@ -168,7 +168,7 @@ export function applyFilters(list: Activity[], f: Filters, center: Place, weathe
     if (f.accessible && a.accessible !== true) return false;
     if (f.maxDurationMin && (a.durationMin == null || a.durationMin > f.maxDurationMin)) return false;
     if (f.group && (a.groupMax == null || a.groupMax < f.group)) return false;
-    if (f.openAt !== "any" && isOpenAt(a.hours, OPEN_HOUR[f.openAt]()) !== true) return false;
+    if (f.openAt !== "any" && isOpenAt(a.hours, OPEN_HOUR[f.openAt](), undefined, a.hoursDetail) !== true) return false;
     if (f.text && !matchesText(a, f.text)) return false;
     return true;
   });
@@ -183,11 +183,11 @@ export function score(a: Activity, center: Place, weather?: Weather | null) {
   if (a.tags.includes("gem")) s += 0.4;
   if (hasTag(a, "weird")) s += 0.3;
   if (weather?.isWet) s += a.indoor ? 1.2 : a.indoor === false ? -1.5 : 0;
-  if (a.source === "osm" && a.category === "chaincafe") s -= 0.8;
+  if (isOpenData(a) && a.category === "chaincafe") s -= 0.8;
   // A place we can actually show is a better first impression than an illustration.
   if (a.photos?.length) s += 0.5;
   // Gyms, sports clubs and shops are useful to find but aren't what people open a fun-things guide for.
-  if (a.source === "osm" && (a.typeLabel === "Leisure centre" || a.typeLabel === "Games shop")) s -= 0.6;
+  if (isOpenData(a) && (a.typeLabel === "Leisure centre" || a.typeLabel === "Games shop")) s -= 0.6;
   return s;
 }
 

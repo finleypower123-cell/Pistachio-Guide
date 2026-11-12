@@ -3,8 +3,10 @@ import { localName, withLocalName } from "../src/lib/names";
 import { createHash } from "node:crypto";
 import { directThumb, md5 } from "../src/lib/wiki";
 import assert from "node:assert/strict";
-import { parseOsmHours, isOpenAt } from "../src/lib/hours";
-import { elementToActivity, buildAroundQuery, elementsToPlaces } from "../src/lib/osm";
+import { parseOsmHours, isOpenAt, openStatus, parseHoursLight, formatRanges, weekRows } from "../src/lib/hours";
+import { fullHours } from "../src/lib/hours-full";
+import { cleanName, mergeOverture, overturePlaceById, overtureToActivity, sameName, streetOnly, type OverturePlace } from "../src/lib/overture";
+import { elementToActivity, buildAroundQuery, elementsToPlaces, isListedChain } from "../src/lib/osm";
 import { loadNearbyPlaces, loadPlaceById, timing } from "../src/lib/discover";
 import { blurbFor } from "../src/lib/blurbs";
 import { PHOTON_GROUPS, photonPacing, photonToElement } from "../src/lib/places-fallback";
@@ -552,8 +554,131 @@ async function wikiTests() {
   }
 }
 
+// Full opening_hours parser (server and city build)
+{
+  const when = new Date(2026, 10, 12); // a Thursday
+  const lunch = fullHours("Mo-Fr 08:00-12:00,13:30-18:00; Sa 09:00-17:00; PH off", 50.85, 4.35, when)!;
+  assert.deepEqual(lunch.hours[1], [8, 18]);
+  assert.deepEqual(lunch.detail![1], [[8, 12], [13.5, 18]]);
+  assert.equal(lunch.hours[0], null);
+  assert.equal(isOpenAt(lunch.hours, 12.5, 1, lunch.detail), false, "closed over lunch");
+  assert.equal(isOpenAt(lunch.hours, 14, 1, lunch.detail), true);
+  assert.equal(formatRanges(weekRows(lunch.hours, lunch.detail)[0].ranges), "08:00–12:00, 13:30–18:00");
+  // Seasons: November uses the winter rule
+  assert.deepEqual(fullHours("Apr-Sep: Mo-Su 10:00-20:00; Oct-Mar: Mo-Su 10:00-17:00", 50.85, 4.35, when)!.hours[4], [10, 17]);
+  // Late nights stay with the evening they start
+  const late = fullHours("Fr-Sa 20:00-03:00", 51.5, -0.1, when)!;
+  assert.deepEqual(late.hours[5], [20, 27]);
+  assert.equal(late.hours[6]?.[0], 20);
+  assert.equal(isOpenAt(late.hours, 2, 6), true, "still open early Saturday");
+  // 24/7 is every day, and open-ended or appointment-only hours are not guessed
+  assert.deepEqual(fullHours("24/7", 50.85, 4.35, when)!.hours, [0, 1, 2, 3, 4, 5, 6].map(() => [0, 24]));
+  assert.equal(fullHours("Mo-Sa 11:00+", 50.85, 4.35, when), null);
+  assert.equal(fullHours("Mo-Fr 10:00-19:00 \"by appointment\"", 50.85, 4.35, when), null);
+  assert.equal(fullHours("not hours at all", 50.85, 4.35, when), undefined);
+  // Public holidays don't close that weekday for good: 25 Dec and 1 Jan 2027 are both Fridays
+  assert.deepEqual(fullHours("Mo-Su 09:00-17:00; PH off", 50.85, 4.35, new Date(2026, 11, 20))!.hours[5], [9, 17]);
+  assert.deepEqual(fullHours("Mo-Su 09:00-17:00; PH off", 50.85, 4.35, new Date(2026, 10, 8))!.hours[3], [9, 17], "11 November");
+  // Sentences
+  assert.equal(hoursSentence(lunch.hours, lunch.detail), "Opening hours vary through the week; see below.");
+  const split = fullHours("Mo-Su 08:00-12:00,14:00-18:00", 50.85, 4.35, when)!;
+  assert.equal(hoursSentence(split.hours, split.detail), "Open every day, 08:00 to 12:00 and 14:00 to 18:00.");
+  assert.equal(hoursSentence(late.hours), "Open Friday and Saturday, 20:00 to 03:00.");
+  assert.equal(hoursSentence(fullHours("24/7", 50.85, 4.35, when)!.hours), "Open 24 hours, every day.");
+  // The light browser parser keeps lunch breaks too
+  assert.deepEqual(parseHoursLight("Mo-Fr 09:00-12:00,13:00-17:00")!.detail![2], [[9, 12], [13, 17]]);
+  assert.equal(typeof openStatus(lunch.hours, lunch.detail).text, "string");
+}
+
+// Chains from the Name Suggestion Index
+{
+  const cafe = (name: string) => ({ amenity: "cafe", name });
+  assert.equal(isListedChain(cafe("Starbucks")), true);
+  assert.equal(isListedChain(cafe("Costa Coffee Victoria")), true);
+  assert.equal(isListedChain(cafe("Exki")), true);
+  assert.equal(isListedChain(cafe("Le Pain Quotidien")), true);
+  assert.equal(isListedChain(cafe("Café Belga")), false);
+  assert.equal(isListedChain(cafe("Coffee House")), false, "generic names are left alone");
+  assert.equal(isListedChain(cafe("Kinepolis")), false, "only brands for the place's own tag");
+  assert.equal(isListedChain({ amenity: "cinema", name: "Kinepolis Brussel" }), true);
+  assert.equal(isListedChain({ shop: "charity", name: "British Heart Foundation" }), true);
+  const el = (tags: Record<string, string>) => elementToActivity({ type: "node", id: 1, lat: 50.85, lon: 4.35, tags })!;
+  assert.equal(el(cafe("Caffè Nero")).category, "chaincafe");
+  assert.equal(el(cafe("Café Belga")).category, "indiecafe");
+  assert.equal(el({ shop: "charity", name: "Oxfam" }).tags.includes("gem"), false);
+}
+
+// Overture Maps places
+{
+  const ovt = (o: Partial<OverturePlace>): OverturePlace => ({
+    id: "8fc2bde5-f235-4171-88d1-f83d9501a22d", name: "Au Grain", lat: 50.8387, lng: 4.2866, primary: "cafe", hierarchy: [], confidence: 0.95,
+    status: null, websites: ["http://www.au-grain.be/"], socials: ["https://www.facebook.com/938961559595202"], phones: ["+3225220041"],
+    brand: null, street: "Bd Sylvain Dupuis 433", locality: "Anderlecht", postcode: "1070", country: "BE", datasets: ["meta"], ...o,
+  });
+  assert.equal(cleanName("La Tourelle."), "La Tourelle");
+  assert.equal(cleanName("www.rsca.be"), null);
+  assert.equal(cleanName("+32 2 529 40 60"), null);
+  assert.equal(streetOnly("Bd Sylvain Dupuis 433"), "Bd Sylvain Dupuis");
+  assert.equal(streetOnly("201 Cheltenham Road"), "Cheltenham Road");
+  assert.equal(sameName("Café Belga", "Belga"), true);
+  assert.equal(sameName("Le Cercle", "Cercle des Voyageurs"), false);
+  assert.equal(sameName("Musée Magritte Museum", "Musee Magritte Museum"), true);
+  assert.equal(sameName("The Book Cafe", "Book Café"), true);
+  assert.equal(sameName("Moeder Lambic", "Moeder Lambic Fontainas"), true);
+  assert.equal(sameName("Kaffabar", "Kaffee Bar"), false);
+
+  const a = overtureToActivity(ovt({}), "brussels")!;
+  assert.equal(a.id, "ovt-brussels-8fc2bde5-f235-4171-88d1-f83d9501a22d");
+  assert.equal(a.source, "overture");
+  assert.equal(a.category, "indiecafe");
+  assert.equal(a.website, "http://www.au-grain.be/");
+  assert.equal(a.links?.facebook, "https://www.facebook.com/938961559595202");
+  assert.equal(a.about, "Au Grain is an independent café on Bd Sylvain Dupuis, Anderlecht. A locally run café for coffee and something to eat.");
+  assert.equal(a.hours, null, "Overture has no hours, so none are made up");
+  assert.equal(overtureToActivity(ovt({ name: "Starbucks" }), "brussels")!.category, "chaincafe");
+  assert.equal(overtureToActivity(ovt({ primary: "dentist" }), "brussels"), null);
+
+  const osm: Activity = { ...elementToActivity({ type: "node", id: 9, lat: 50.8467, lng: 4.3525, lon: 4.3525, tags: { amenity: "cafe", name: "Café Floris" } } as never)! };
+  const merged = mergeOverture(
+    [osm],
+    [
+      // the same café, a few metres off: lends its website and Instagram
+      ovt({ id: "11111111-1111-1111-1111-111111111111", name: "Cafe Floris", lat: 50.8468, lng: 4.3526, websites: ["https://floris.be"], socials: ["https://instagram.com/floris"] }),
+      // new and convincing: added
+      ovt({ id: "22222222-2222-2222-2222-222222222222", name: "Kaffabar", lat: 50.84, lng: 4.34 }),
+      // listed twice by Overture: added once
+      ovt({ id: "33333333-3333-3333-3333-333333333333", name: "Kaffabar", lat: 50.84001, lng: 4.34001, confidence: 0.9 }),
+      // only in a company register: skipped
+      ovt({ id: "44444444-4444-4444-4444-444444444444", name: "Atelier Noir", lat: 50.83, lng: 4.33, datasets: ["BrightQuery"] }),
+      // low confidence, closed, or no way to contact: skipped
+      ovt({ id: "55555555-5555-5555-5555-555555555555", name: "Maybe Café", lat: 50.82, lng: 4.32, confidence: 0.6 }),
+      ovt({ id: "66666666-6666-6666-6666-666666666666", name: "Gone Café", lat: 50.81, lng: 4.31, status: "permanently_closed" }),
+      ovt({ id: "77777777-7777-7777-7777-777777777777", name: "Quiet Café", lat: 50.8, lng: 4.3, websites: [], socials: [], phones: [] }),
+    ],
+    "brussels",
+  );
+  assert.equal(merged.enriched, 1);
+  assert.equal(merged.added, 1);
+  assert.equal(merged.places[0].website, "https://floris.be");
+  assert.equal(merged.places[0].links?.instagram, "https://instagram.com/floris");
+  assert.equal(merged.places[0].name, "Café Floris", "OpenStreetMap's own details are kept");
+  assert.equal(merged.places[1].name, "Kaffabar");
+  assert.equal(merged.places[1].id.endsWith("22222222-2222-2222-2222-222222222222"), true, "the more confident record wins");
+  assert.equal(osm.website, undefined, "the input isn't changed");
+}
+
+async function overtureLookupTests() {
+  const place = { id: "ovt-brussels-22222222-2222-2222-2222-222222222222", name: "Kaffabar" };
+  const asked: string[] = [];
+  const found = await overturePlaceById(place.id, async (path) => (asked.push(path), { places: [place] }));
+  assert.equal(found?.name, "Kaffabar");
+  assert.deepEqual(asked, ["/data/cities/brussels.json"]);
+  assert.equal(await overturePlaceById("osm-node-1", async () => ({ places: [] })), null);
+}
+
 fallbackTests()
   .then(wikiTests)
+  .then(overtureLookupTests)
   .then(
     () => console.log("all logic tests passed"),
     (e) => {

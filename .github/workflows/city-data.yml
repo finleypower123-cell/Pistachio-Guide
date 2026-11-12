@@ -1,7 +1,8 @@
 name: City data
 
 # Rebuilds the ready-made place files for the cities in the location picker, so those cities load
-# at once. Weekly, when the city list or the build script changes, or by hand from the Actions tab.
+# at once. OpenStreetMap places are merged with Overture Maps places, and the chain list is refreshed
+# from the Name Suggestion Index. Weekly, when the city list or the build script changes, or by hand from the Actions tab.
 on:
   schedule:
     - cron: "17 3 * * 1"
@@ -11,6 +12,9 @@ on:
     paths:
       - src/lib/cities.ts
       - scripts/build-city-data.ts
+      - scripts/overture_places.py
+      - scripts/build-chain-names.mjs
+      - src/lib/overture.ts
       - .github/workflows/city-data.yml
 
 permissions:
@@ -30,13 +34,25 @@ jobs:
         with:
           node-version: 20
           cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
       - run: npm ci
+      - name: Chain names from the Name Suggestion Index
+        run: npm i --no-save name-suggestion-index && node scripts/build-chain-names.mjs
+        continue-on-error: true
+      - name: Overture Maps places
+        run: |
+          pip install -q overturemaps pyarrow
+          npx tsx scripts/build-city-data.ts --list > /tmp/cities.json
+          python3 scripts/overture_places.py /tmp/cities.json .overture
+        continue-on-error: true
       - run: npx tsx scripts/build-city-data.ts
       - name: Save the new files
         run: |
           git config user.name "city-data"
           git config user.email "city-data@users.noreply.github.com"
-          git add public/data/cities
+          git add public/data/cities src/data/chain-names.json
           if git diff --cached --quiet; then echo "No change"; exit 0; fi
           git commit -m "Refresh ready-made city data"
           git pull --rebase origin main

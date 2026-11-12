@@ -41,4 +41,6 @@ export interface CityData {
   places: import("./types").Activity[];
   /** Place id to Commons file, so the photo lookup isn't repeated on the device. */
   photos: Record<string, { file: string }>;
+  /** The Overture Maps release merged in, when there was one. */
+  overtureRelease?: string;
 }

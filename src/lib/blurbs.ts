@@ -7,8 +7,8 @@
  * - Facts about the venue itself, taken only from its OpenStreetMap record: street, opening
  *   hours, cuisine, free entry, outdoor seating, step-free access. Nothing is guessed.
  */
-import { formatRange } from "./hours";
-import type { WeeklyHours } from "./types";
+import { dayRanges, formatRange } from "./hours";
+import type { DayRanges, WeeklyHours } from "./types";
 
 const KIND: Record<string, string> = {
   "Escape room": "A themed room where your group solves puzzles against the clock, usually in about an hour. Most are booked ahead.",
@@ -46,6 +46,8 @@ const KIND: Record<string, string> = {
   Karaoke: "Private rooms or a stage for singing, usually booked by the hour.",
   "Indoor play centre": "Soft play and climbing frames for young children.",
   "Boat hire": "Rowing boats, pedalos or small boats to take out on the water.",
+  "Comedy club": "Stand-up comedy nights. Check the listings for who's on.",
+  "Antiques shop": "Old furniture, objects and curiosities to browse.",
   "Music venue": "Live music. Check the listings for who's playing.",
   "Nature reserve": "Protected land with walking paths and wildlife.",
   Castle: "A historic castle. Some have tours, exhibitions or grounds to walk.",
@@ -102,28 +104,32 @@ export function venueFacts(t: Record<string, string>): string {
 const DAY = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 /** "Open every day, 08:00 to 18:00." or "Open Tuesday to Sunday, 10:00 to 17:00." when the hours are that simple. */
-export function hoursSentence(hours: WeeklyHours | null | undefined): string {
+export function hoursSentence(hours: WeeklyHours | null | undefined, detail?: DayRanges): string {
   if (!hours) return "";
   const order = [1, 2, 3, 4, 5, 6, 0];
-  const ranges = order.map((d) => hours[d] ?? null);
-  const open = ranges.filter((r): r is [number, number] => r !== null);
-  if (!open.length) return "";
-  const same = (x: [number, number], y: [number, number]) => x[0] === y[0] && x[1] === y[1];
-  if (!open.every((r) => same(r, open[0]))) {
+  const spoken = (list: [number, number][]) => list.map((r) => formatRange(r).replace("–", " to ")).join(" and ");
+  const days = order.map((d) => dayRanges(hours, d, detail));
+  const sigs = days.map((d) => (d.length ? spoken(d) : ""));
+  const openIdx = sigs.map((s, i) => (s ? i : -1)).filter((i) => i >= 0);
+  if (!openIdx.length) return "";
+  const distinct = [...new Set(openIdx.map((i) => sigs[i]))];
+  if (distinct.length > 1) {
     // Open every day with one day different reads better spelled out than "see below".
-    const odd = ranges.findIndex((r, i) => r && ranges.filter((q) => q && same(q, r)).length === 1 && i >= 0);
-    const usual = ranges.find((r, i) => r && i !== odd);
-    if (open.length === 7 && odd >= 0 && usual && ranges.filter((r) => r && same(r, usual)).length === 6)
-      return `Open every day, ${formatRange(usual).replace("–", " to ")}, except ${DAY[order[odd]]}, ${formatRange(ranges[odd]!).replace("–", " to ")}.`;
+    if (openIdx.length === 7 && distinct.length === 2) {
+      const [x, y] = distinct;
+      const countX = sigs.filter((s) => s === x).length;
+      const [usual, odd] = countX === 6 ? [x, y] : countX === 1 ? [y, x] : [null, null];
+      if (usual && odd) return `Open every day, ${usual}, except ${DAY[order[sigs.indexOf(odd)]]}, ${odd}.`;
+    }
     return "Opening hours vary through the week; see below.";
   }
-  const span = formatRange(open[0]).replace("–", " to ");
-  if (open.length === 7) return `Open every day, ${span}.`;
-  const isOpen = ranges.map(Boolean);
-  const first = isOpen.indexOf(true);
-  const last = isOpen.lastIndexOf(true);
-  if (isOpen.slice(first, last + 1).every(Boolean)) return `Open ${DAY[order[first]]} to ${DAY[order[last]]}, ${span}.`;
-  return `Open ${list(order.filter((_, i) => isOpen[i]).map((d) => DAY[d]))}, ${span}.`;
+  const span = distinct[0];
+  if (span === "Open 24 hours") return openIdx.length === 7 ? "Open 24 hours, every day." : `Open 24 hours on ${list(openIdx.map((i) => DAY[order[i]]))}.`;
+  if (openIdx.length === 7) return `Open every day, ${span}.`;
+  const first = openIdx[0];
+  const last = openIdx[openIdx.length - 1];
+  if (openIdx.length > 2 && last - first + 1 === openIdx.length) return `Open ${DAY[order[first]]} to ${DAY[order[last]]}, ${span}.`;
+  return `Open ${list(openIdx.map((i) => DAY[order[i]]))}, ${span}.`;
 }
 
 /** "Waffelin is an independent café on Rue de la Madeleine, Brussels." */

@@ -13,7 +13,7 @@ import { CAT } from "@/lib/categories";
 import { distanceKm } from "@/lib/geo";
 import { SHOW_DEMO } from "@/lib/preview";
 import { MOODS, applyFilters, defaultFilters, score } from "@/lib/search";
-import type { Activity, CategoryId } from "@/lib/types";
+import { isOpenData, type Activity, type CategoryId } from "@/lib/types";
 
 const HERO_CATS: { id: CategoryId; label: string }[] = [
   { id: "escape", label: "Escape rooms" },
@@ -103,7 +103,7 @@ export default function Home() {
     SHOW_DEMO ? a.source === "demo" && (a.tags.includes("weird") || a.tags.includes("gem")) : a.tags.includes("weird") || UNUSUAL_CATS.includes(a.category),
   );
   const free = top((a) => a.price === 0);
-  const real = top((a) => a.source === "osm" && a.category !== "chaincafe", 12);
+  const real = top((a) => isOpenData(a) && a.category !== "chaincafe", 12);
   const rainy = top((a) => a.indoor === true);
   const gems = top((a) => a.tags.includes("gem") && ["indiecafe", "vintage", "boardgame", "museum", "art", "cinema"].includes(a.category));
   const under20 = top((a) => a.price != null && a.price > 0 && a.price < 20);

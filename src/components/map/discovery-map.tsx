@@ -7,7 +7,7 @@ import { useApp } from "@/components/providers/app-provider";
 import { useUser } from "@/components/providers/user-provider";
 import { distanceKm, offsetKm } from "@/lib/geo";
 import { PREVIEW, SHOW_DEMO } from "@/lib/preview";
-import type { Activity, Place } from "@/lib/types";
+import { isOpenData, type Activity, type Place } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 function circle(center: Place, km: number) {
@@ -136,8 +136,8 @@ export function DiscoveryMap({
                     className={cn(
                       "grid place-items-center rounded-full border-2 border-white shadow-md transition-transform",
                       on ? "size-9 scale-110" : "size-7 hover:scale-110",
-                      a.source === "osm" ? "bg-[#2f6f8a]" : "bg-[#254C38]",
-                      a.price === 0 && a.source !== "osm" && "bg-[#7da35a]",
+                      isOpenData(a) ? "bg-[#2f6f8a]" : "bg-[#254C38]",
+                      a.price === 0 && !isOpenData(a) && "bg-[#7da35a]",
                     )}
                   >
                     {saved ? <Heart className="size-3.5 fill-white text-white" /> : <span className="size-2 rounded-full bg-white/90" />}
