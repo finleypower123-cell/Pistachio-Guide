@@ -112,7 +112,11 @@ const NEW_PLACE_CONFIDENCE = 0.85;
 
 /** "La Tourelle." → "La Tourelle"; drops names that are really a web address or phone number. */
 export function cleanName(raw: string): string | null {
-  const name = raw.replace(/\s+/g, " ").replace(/[.\s]+$/, "").trim();
+  const name = raw
+    .replace(/\s+/g, " ")
+    .replace(/[\s,]+(ltd|limited|bvba|bv|sprl|srl|nv|sa)\.?$/i, "")
+    .replace(/[.\s]+$/, "")
+    .trim();
   if (name.length < 2 || name.length > 70) return null;
   if (/https?:|www\.|\.(com|be|co\.uk|org|net|eu)\b|@/i.test(name)) return null;
   if (!/[a-zà-ÿ]/i.test(name) || /^\+?[\d\s/().-]+$/.test(name)) return null;
@@ -238,6 +242,15 @@ export interface MergeResult {
 export function mergeOverture(osm: Activity[], overture: OverturePlace[], citySlug: string, maxNew = 300): MergeResult {
   const places = osm.map((p) => ({ ...p }));
   let enriched = 0;
+  // A name found at two or more spots across town is a chain, even a small local one.
+  const spots = new Map<string, { lat: number; lng: number }[]>();
+  for (const p of [...osm, ...overture]) {
+    const k = plainName(p.name);
+    const seen = spots.get(k) ?? [];
+    if (!seen.some((q) => distanceKm(q, p) < 0.3)) seen.push({ lat: p.lat, lng: p.lng });
+    spots.set(k, seen);
+  }
+  const branches = (name: string) => spots.get(plainName(name))?.length ?? 0;
   const candidates: { o: OverturePlace; a: Activity }[] = [];
   const near = (a: { lat: number; lng: number }, b: { lat: number; lng: number }, km: number) =>
     Math.abs(a.lat - b.lat) < km / 100 && Math.abs(a.lng - b.lng) < km / 60 && distanceKm(a, b) <= km;
@@ -269,7 +282,7 @@ export function mergeOverture(osm: Activity[], overture: OverturePlace[], citySl
     if (!addable(o)) continue;
     const a = overtureToActivity(o, citySlug);
     // Chains are easy to find without us, and would crowd out the independents.
-    if (!a || a.category === "chaincafe" || isChain(o, a.name)) continue;
+    if (!a || a.category === "chaincafe" || isChain(o, a.name) || branches(o.name) > 1) continue;
     // A listing of the same kind a few steps away is very likely the same place under another name.
     if (places.some((p) => p.category === a.category && near(p, a, 0.03))) continue;
     candidates.push({ o, a });

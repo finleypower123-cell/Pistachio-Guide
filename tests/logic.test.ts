@@ -622,6 +622,7 @@ async function wikiTests() {
   });
   assert.equal(cleanName("La Tourelle."), "La Tourelle");
   assert.equal(cleanName("www.rsca.be"), null);
+  assert.equal(cleanName("The Electric Elephant Cafe Ltd"), "The Electric Elephant Cafe");
   assert.equal(cleanName("+32 2 529 40 60"), null);
   assert.equal(streetOnly("Bd Sylvain Dupuis 433"), "Bd Sylvain Dupuis");
   assert.equal(streetOnly("201 Cheltenham Road"), "Cheltenham Road");
@@ -655,8 +656,10 @@ async function wikiTests() {
       ovt({ id: "22222222-2222-2222-2222-222222222222", name: "Kaffabar", lat: 50.84, lng: 4.34 }),
       // listed twice by Overture: added once
       ovt({ id: "33333333-3333-3333-3333-333333333333", name: "Kaffabar", lat: 50.84001, lng: 4.34001, confidence: 0.9 }),
-      // a chain: skipped
+      // a chain: skipped, and so is a small local one with two branches
       ovt({ id: "88888888-8888-8888-8888-888888888888", name: "Costa Coffee", lat: 50.835, lng: 4.335 }),
+      ovt({ id: "99999999-9999-9999-9999-999999999991", name: "Belga & Co", lat: 50.83, lng: 4.36 }),
+      ovt({ id: "99999999-9999-9999-9999-999999999992", name: "Belga & Co", lat: 50.81, lng: 4.38 }),
       // only in a company register: skipped
       ovt({ id: "44444444-4444-4444-4444-444444444444", name: "Atelier Noir", lat: 50.83, lng: 4.33, datasets: ["BrightQuery"] }),
       // low confidence, closed, or no way to contact: skipped
