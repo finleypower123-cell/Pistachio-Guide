@@ -31,7 +31,7 @@ function Fact({ icon: Icon, label, value }: { icon: typeof Clock; label: string;
     <div className="flex items-start gap-3 rounded-2xl bg-surface p-3.5">
       <Icon className="mt-0.5 size-5 shrink-0 text-accent-ink" />
       <div className="min-w-0">
-        <div className="text-[12px] font-extrabold uppercase tracking-wider text-ink-soft">{label}</div>
+        <div className="text-[12px] font-extrabold text-ink-soft">{label}</div>
         <div className="font-bold">{value}</div>
       </div>
     </div>
@@ -235,7 +235,7 @@ export default function ActivityPage() {
           </button>
         ))}
       </div>
-      {!photoCount && <p className="mt-2 text-xs text-ink-soft">No photos of this place yet, so here&apos;s a drawing of the general idea.</p>}
+      {!photoCount && <p className="mt-2 text-xs text-ink-soft">No photos of this place yet.</p>}
       {credits.length > 0 && (
         <p className="mt-2 text-xs text-ink-soft">
           {credits.length > 1 ? "Photos" : "Photo"} from Wikimedia Commons:{" "}
@@ -253,7 +253,7 @@ export default function ActivityPage() {
       <div className="mt-6 grid gap-10 lg:grid-cols-[1fr_360px]">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-sm font-extrabold uppercase tracking-wider text-ink-soft">{a.typeLabel ?? CAT[a.category].short}</span>
+            <span className="text-sm font-extrabold text-ink-soft">{a.typeLabel ?? CAT[a.category].short}</span>
             {(SHOW_DEMO || a.source === "business") && <SourceBadge a={a} />}
             {a.sponsored && <SponsoredBadge />}
             {a.deal && <DealBadge />}
@@ -321,7 +321,7 @@ export default function ActivityPage() {
             )}
             {a.special && (
               <div className="mt-5 rounded-[22px] bg-accent/40 p-5">
-                <h3 className="font-sans text-sm font-extrabold uppercase tracking-wider text-accent-ink">What makes it special</h3>
+                <h3 className="font-sans text-sm font-extrabold text-accent-ink">What makes it special</h3>
                 <p className="mt-1.5 font-display text-xl font-bold">{a.special}</p>
               </div>
             )}

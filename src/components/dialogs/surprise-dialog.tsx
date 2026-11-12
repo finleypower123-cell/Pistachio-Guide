@@ -73,7 +73,7 @@ export function SurpriseDialog() {
               <SaveButton a={pick} className="absolute right-3 top-3" />
             </div>
             <div className="mt-4 flex items-center gap-2">
-              <span className="text-xs font-extrabold uppercase tracking-wider text-ink-soft">{pick.typeLabel ?? CAT[pick.category].short}</span>
+              <span className="text-xs font-extrabold text-ink-soft">{pick.typeLabel ?? CAT[pick.category].short}</span>
               {(SHOW_DEMO || pick.source === "business") && <SourceBadge a={pick} />}
             </div>
             <h3 className="mt-1 text-3xl font-bold">{pick.name}</h3>

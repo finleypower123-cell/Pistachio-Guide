@@ -5,36 +5,28 @@ import { cn } from "@/lib/utils";
 import { Photo } from "./photo";
 
 /**
- * Category illustrations, shown when a place has no real photo and behind one while it loads.
- * Generated SVG (no external images), seeded per listing so each card looks distinct.
+ * The picture shown when a place has no real photo, and behind a photo while it loads.
+ *
+ * Deliberately plain: one flat brand colour per family of places and a single small line icon,
+ * like a category marker on a map. No scattered shapes or random tilts, which read as clip art.
+ * Families keep a consistent colour, so a list of mixed places still looks ordered.
  */
 
-const PALETTES: [string, string, string][] = [
-  ["#A8C686", "#D7E6C4", "#254C38"],
-  ["#254C38", "#3E6A50", "#F7F5EC"],
-  ["#E5EEDC", "#A8C686", "#254C38"],
-  ["#F1DDB6", "#A8C686", "#254C38"],
-  ["#C9DBB2", "#F7F5EC", "#254C38"],
-  ["#F7F5EC", "#E5EEDC", "#254C38"],
-];
+type Tone = [bg: string, ink: string, fill: string];
+const TONES: Record<"play" | "culture" | "outdoors" | "food", Tone> = {
+  play: ["#A8C686", "#254C38", "#F7F5EC"],
+  culture: ["#254C38", "#F7F5EC", "#3E6A50"],
+  outdoors: ["#E5EEDC", "#254C38", "#A8C686"],
+  food: ["#F1DDB6", "#254C38", "#F7F5EC"],
+};
+const FAMILY: Partial<Record<CategoryId, keyof typeof TONES>> = {
+  escape: "play", arcade: "play", boardgame: "play", bowling: "play", golf: "play", climbing: "play", trampoline: "play",
+  themepark: "play", icerink: "play", karaoke: "play", softplay: "play", leisure: "play",
+  museum: "culture", art: "culture", cinema: "culture", live: "culture", historic: "culture", workshop: "culture",
+  park: "outdoors", walk: "outdoors", swim: "outdoors", water: "outdoors", zoo: "outdoors", boats: "outdoors",
+  indiecafe: "food", chaincafe: "food", food: "food", brewery: "food", market: "food", vintage: "food",
+};
 
-function hash(s: string) {
-  let h = 2166136261;
-  for (const c of s) {
-    h ^= c.charCodeAt(0);
-    h = Math.imul(h, 16777619);
-  }
-  return h >>> 0;
-}
-function rng(seed: number) {
-  let a = seed;
-  return () => {
-    a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
 
 function icon(key: IconKey, k: string, f: string) {
   const S = `stroke="${k}" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"`;
@@ -72,18 +64,11 @@ function icon(key: IconKey, k: string, f: string) {
 }
 
 export function artSvg(category: CategoryId, seed: string) {
-  const r = rng(hash(seed));
-  const [bg, sh, ink] = PALETTES[Math.floor(r() * PALETTES.length)];
-  const fill = bg === "#A8C686" ? "#F7F5EC" : "#A8C686";
-  let decor = `<circle cx="${130 + r() * 40}" cy="${40 + r() * 60}" r="${50 + r() * 20}" fill="${sh}" opacity=".55"/>`;
-  for (let i = 0; i < 5; i++) {
-    const x = r() * 200, y = r() * 150, s = 6 + r() * 24;
-    decor += r() > 0.5
-      ? `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${(s / 2).toFixed(1)}" fill="${sh}" opacity=".7"/>`
-      : `<path d="M${x.toFixed(1)} ${y.toFixed(1)} q 8 -10 16 0 t 16 0" stroke="${sh}" stroke-width="4" fill="none" stroke-linecap="round"/>`;
-  }
-  const t = `translate(100 78) scale(${(0.95 + r() * 0.2).toFixed(2)}) rotate(${((r() - 0.5) * 14).toFixed(1)})`;
-  return `<svg viewBox="0 0 200 150" preserveAspectRatio="xMidYMid slice" width="100%" height="100%" aria-hidden="true"><rect width="200" height="150" fill="${bg}"/>${decor}<g transform="${t}">${icon(CAT[category].icon, ink, fill)}</g></svg>`;
+  const [bg, ink, fill] = TONES[FAMILY[category] ?? "outdoors"];
+  // Gallery slots (seed ends in :1, :2 ...) get the neighbouring tone so the strip isn't uniform.
+  const slot = Number(seed.split(":").pop()) || 0;
+  const [b2, k2, f2] = slot ? Object.values(TONES)[(Object.keys(TONES).indexOf(FAMILY[category] ?? "outdoors") + slot) % 4] : [bg, ink, fill];
+  return `<svg viewBox="0 0 200 150" preserveAspectRatio="xMidYMid slice" width="100%" height="100%" aria-hidden="true"><rect width="200" height="150" fill="${b2}"/><g transform="translate(100 75) scale(0.62)">${icon(CAT[category].icon, k2, f2)}</g></svg>`;
 }
 
 export const ActivityArt = memo(function ActivityArt({

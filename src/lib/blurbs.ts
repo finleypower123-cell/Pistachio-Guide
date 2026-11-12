@@ -1,96 +1,127 @@
 /**
- * Short, friendly descriptions for places that come with no description of their own.
+ * Words for places that come without a description of their own.
  *
- * Each line describes the KIND of place (an escape room, a market), never the particular venue:
- * no claims about quality, price, opening times, size or what a specific place offers. Anything
- * specific must come from real data. A place always gets the same line (chosen from its id), so
- * the page doesn't change between visits.
+ * Two parts, kept apart on purpose:
+ * - A line about the KIND of place (what an escape room is, what to expect at a market). It is
+ *   written plainly, like a local guide, and never claims anything about the particular venue.
+ * - Facts about the venue itself, taken only from its OpenStreetMap record: street, opening
+ *   hours, cuisine, free entry, outdoor seating, step-free access. Nothing is guessed.
  */
-const BLURBS: Record<string, string[]> = {
-  "Escape room": [
-    "Fancy locking yourself in a room and trying to get out before the clock runs down? Bring your sharpest friends.",
-    "An hour, a locked door and a pile of clues. Friendships have been tested by less.",
-    "Puzzles, padlocks and mild panic. Best with people who stay calm under pressure.",
-  ],
-  Arcade: [
-    "Buttons to mash and high scores to chase. Bring a competitive streak.",
-    "Flashing lights, joysticks and the quiet thrill of beating a stranger's score.",
-  ],
-  "Bowling alley": [
-    "Borrowed shoes, heavy balls and loud celebrations over very little. A classic for a reason.",
-    "Ten pins, questionable technique and one person taking it far too seriously.",
-  ],
-  "Mini golf": [
-    "Tiny clubs, daft obstacles and a scorecard nobody trusts.",
-    "Golf, minus the long walk and the dress code.",
-  ],
-  "Trampoline park": [
-    "Wall-to-wall trampolines for bouncing off the day. Harder work than it looks.",
-    "Jump about until your legs give in. Grown-ups are allowed to enjoy it too.",
-  ],
-  Climbing: [
-    "Walls to scramble up and mats to land on. Your forearms will have opinions tomorrow.",
-    "Pick a route, reach for the next hold and try not to look down.",
-  ],
-  "Water park": ["Slides, splashes and the walk back up the stairs for one more go."],
-  "Swimming pool": ["Lengths, lanes or just a float about. Pack a towel.", "A swim to clear your head. Goggles optional."],
-  "Swimming centre": ["Lengths, lanes or just a float about. Pack a towel."],
-  "Leisure centre": ["Courts, classes and kit under one roof, for when you fancy moving about a bit."],
-  "Board-game café": ["Shelves of board games and something to drink while you argue about the rules."],
-  "Games shop": ["Board games, cards and dice. Dangerous for anyone who only wants a look."],
-  "Independent café": [
-    "A local café for a proper sit-down coffee and a bit of people-watching.",
-    "Coffee, something sweet and nowhere you need to be for an hour.",
-    "One of the neighbourhood's own. Pull up a chair.",
-  ],
-  "Chain café": ["A familiar name for when you just need a coffee."],
-  "Independent cinema": ["Big screen, dark room, phone away. Still the best way to see a film."],
-  Cinema: ["Big screen, dark room, phone away. Still the best way to see a film."],
-  Theatre: ["Live on stage and different every night. See what's on before you go."],
-  "Arts centre": ["Shows, exhibitions and classes under one roof. See what's on this week."],
-  Market: [
-    "Stalls to browse, things to taste and at least one purchase you didn't plan.",
-    "Wander the stalls and see what turns up. Bring a bag.",
-  ],
-  Museum: [
-    "Things in glass cases and the stories behind them. You'll leave knowing something new.",
-    "A good hour or two for the curious, whatever the weather.",
-    "Step inside and let your curiosity do the walking.",
-  ],
-  Gallery: ["Walls of art to wander past at your own pace. No expertise required.", "Come for a look, stay for the one piece you can't stop thinking about."],
-  "Local attraction": ["One of the sights around here. Worth a detour if you're nearby.", "The sort of thing you walk past for years, then finally stop and look at."],
-  Viewpoint: ["Somewhere to stop, look out and take the photo everyone takes."],
-  Park: [
-    "Grass, trees and room to breathe. Bring a picnic or just go for a wander.",
-    "Green space for a stroll, a sit-down or a kickabout.",
-    "Fresh air and a bench with your name on it.",
-  ],
-  Garden: ["Planted paths and quiet corners. A calm half hour away from the noise.", "A green pocket to slow down in."],
-  Zoo: ["Fur, feathers and feeding times. Find your favourite and stay a while.", "Animals doing animal things. Somehow always worth the trip."],
-  Aquarium: ["Tanks of things that glow, glide and stare back. Oddly calming."],
-  "Theme park": ["Queues, screams and one more go. Eat after the big rides, not before."],
-  "Ice rink": ["Wobbly first laps and the odd show-off gliding past. Gloves recommended."],
-  Planetarium: ["Lean back and look up. The universe, minus the cold and the clouds."],
-  Karaoke: ["A microphone, a screen and a song you definitely know the words to. Probably."],
-  "Indoor play centre": ["Slides, ball pits and climbing frames for small people with energy to burn."],
-  "Boat hire": ["Take to the water under your own steam. Steering is harder than it looks."],
-  "Music venue": ["A room, a stage and something loud. See who's playing before you go."],
-  "Nature reserve": ["Paths, birdsong and wild corners left to get on with it. Bring decent shoes."],
-  Castle: ["Thick walls and a long history. Good for a wander and a bit of imagination."],
-  Ruins: ["What's left of something much older. Go and work out what it used to be."],
-  Brewery: ["Where the beer is made, and often poured too. See if they have a taproom or tours before you go."],
-  "Charity shop": ["Second-hand shelves for bargain hunters. You never know what's turned up this week."],
-  "Second-hand shop": ["Pre-loved finds waiting for a new home. Half the fun is the rummage."],
+import { formatRange } from "./hours";
+import type { WeeklyHours } from "./types";
+
+const KIND: Record<string, string> = {
+  "Escape room": "A themed room where your group solves puzzles against the clock, usually in about an hour. Most are booked ahead.",
+  Arcade: "Video games, pinball and coin-op machines you pay for by the go.",
+  "Bowling alley": "Lanes, hired shoes and a scoreboard. Easy for groups and any age.",
+  "Mini golf": "Short putting holes with obstacles. Quick to pick up and good with children.",
+  "Trampoline park": "Wall-to-wall trampolines, usually booked in timed sessions.",
+  Climbing: "Walls with routes graded for different levels. Shoes can usually be hired, and bouldering needs no rope.",
+  "Water park": "Pools and slides. Bring swimwear and a towel.",
+  "Swimming pool": "A public pool for lengths or a swim about. Session times vary through the week.",
+  "Swimming centre": "A public pool for lengths or a swim about. Session times vary through the week.",
+  "Leisure centre": "Sports halls, a gym or classes, usually pay-as-you-go or by membership.",
+  "Board-game café": "A café with shelves of board games to play at your table.",
+  "Games shop": "A shop for board games, card games and miniatures.",
+  "Independent café": "A locally run café for coffee and something to eat.",
+  "Chain café": "A branch of a café chain.",
+  "Independent cinema": "An independent cinema. Check the listings for what's showing.",
+  Cinema: "A cinema. Check the listings for what's showing.",
+  Theatre: "A theatre with live performances through the season.",
+  "Arts centre": "A venue for exhibitions, performances and classes.",
+  Market: "A market with stalls. Days and times vary, so check before you go.",
+  Museum: "A museum with permanent collections and changing exhibitions. Allow an hour or two.",
+  Gallery: "A gallery showing art, usually with exhibitions that change through the year.",
+  "Local attraction": "One of the local sights, worth a look if you're nearby.",
+  Viewpoint: "A spot with a view out over the area.",
+  Park: "A public park with open space, paths and somewhere to sit.",
+  Garden: "A planted garden with paths and quiet places to sit.",
+  "Charity shop": "Second-hand clothes, books and homeware, sold to raise money for a charity.",
+  "Second-hand shop": "Second-hand and vintage clothes and things for the home.",
+  Zoo: "Animals from around the world. Plan on a few hours.",
+  Aquarium: "Tanks of fish and other sea life, all indoors.",
+  "Theme park": "Rides and attractions, usually a full day out.",
+  "Ice rink": "Public skating sessions on ice. Skates are usually for hire.",
+  Planetarium: "Shows about space and the night sky, projected on a dome overhead.",
+  Karaoke: "Private rooms or a stage for singing, usually booked by the hour.",
+  "Indoor play centre": "Soft play and climbing frames for young children.",
+  "Boat hire": "Rowing boats, pedalos or small boats to take out on the water.",
+  "Music venue": "Live music. Check the listings for who's playing.",
+  "Nature reserve": "Protected land with walking paths and wildlife.",
+  Castle: "A historic castle. Some have tours, exhibitions or grounds to walk.",
+  Ruins: "The remains of a historic building.",
+  Brewery: "Where beer is brewed. Some have a taproom or run tours.",
 };
 
-function hash(s: string) {
-  let h = 0;
-  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
-  return h;
+/** A plain line about this kind of place, or null when there is nothing useful to say. */
+export function blurbFor(typeLabel: string): string | null {
+  return KIND[typeLabel] ?? null;
 }
 
-/** A line for this kind of place, or null when we have nothing honest to say beyond the type. */
-export function blurbFor(typeLabel: string, id: string): string | null {
-  const lines = BLURBS[typeLabel];
-  return lines ? lines[hash(id) % lines.length] : null;
+const CUISINE: Record<string, string> = {
+  coffee_shop: "coffee",
+  cake: "cake",
+  ice_cream: "ice cream",
+  breakfast: "breakfast",
+  brunch: "brunch",
+  sandwich: "sandwiches",
+  tea: "tea",
+  bubble_tea: "bubble tea",
+  crepe: "crêpes",
+  waffle: "waffles",
+  pastry: "pastries",
+  bagel: "bagels",
+  juice: "juices",
+  donut: "doughnuts",
+  vegan: "vegan food",
+  vegetarian: "vegetarian food",
+};
+
+const list = (xs: string[]) => (xs.length < 2 ? (xs[0] ?? "") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`);
+
+/**
+ * Short facts about the venue from its OpenStreetMap tags, as a sentence or two.
+ * Returns "" when the record says nothing useful.
+ */
+export function venueFacts(t: Record<string, string>): string {
+  const out: string[] = [];
+  const serves = (t.cuisine ?? "")
+    .split(";")
+    .map((c) => CUISINE[c.trim().toLowerCase()])
+    .filter((c): c is string => Boolean(c));
+  if (serves.length) out.push(`Serves ${list([...new Set(serves)].slice(0, 3))}.`);
+  const extras: string[] = [];
+  if (t.outdoor_seating === "yes") extras.push("outdoor seating");
+  if (t.internet_access === "wlan" || t.internet_access === "yes") extras.push("wifi");
+  if (t.wheelchair === "yes") extras.push("step-free access");
+  if (extras.length) out.push(`${list(extras)[0].toUpperCase()}${list(extras).slice(1)}.`);
+  if (t.fee === "no") out.push("Free to get in.");
+  return out.join(" ");
+}
+
+const DAY = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+/** "Open every day, 08:00 to 18:00." or "Open Tuesday to Sunday, 10:00 to 17:00." when the hours are that simple. */
+export function hoursSentence(hours: WeeklyHours | null | undefined): string {
+  if (!hours) return "";
+  const order = [1, 2, 3, 4, 5, 6, 0];
+  const ranges = order.map((d) => hours[d] ?? null);
+  const open = ranges.filter((r): r is [number, number] => r !== null);
+  if (!open.length) return "";
+  if (!open.every((r) => r[0] === open[0][0] && r[1] === open[0][1])) return "Opening hours vary through the week; see below.";
+  const span = formatRange(open[0]).replace("–", " to ");
+  if (open.length === 7) return `Open every day, ${span}.`;
+  const isOpen = ranges.map(Boolean);
+  const first = isOpen.indexOf(true);
+  const last = isOpen.lastIndexOf(true);
+  if (isOpen.slice(first, last + 1).every(Boolean)) return `Open ${DAY[order[first]]} to ${DAY[order[last]]}, ${span}.`;
+  return `Open ${list(order.filter((_, i) => isOpen[i]).map((d) => DAY[d]))}, ${span}.`;
+}
+
+/** "Waffelin is an independent café on Rue de la Madeleine, Brussels." */
+export function introSentence(name: string, typeLabel: string, street?: string, city?: string): string {
+  const kind = typeLabel.toLowerCase().replace(/^(independent|chain) cinema$/, "$1 cinema");
+  const article = /^[aeiou]/i.test(kind) ? "an" : "a";
+  const where = street ? ` on ${street}${city ? `, ${city}` : ""}` : city ? ` in ${city}` : "";
+  return `${name} is ${article} ${kind}${where}.`;
 }

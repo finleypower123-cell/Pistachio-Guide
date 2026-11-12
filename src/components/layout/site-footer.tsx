@@ -13,7 +13,7 @@ export function SiteFooter() {
           <p className="mt-3 text-sm text-ink-soft">Find the fun stuff. Hidden gems, weird little adventures and brilliant things to do near you.</p>
         </div>
         <div className="text-sm">
-          <h2 className="mb-2 font-sans text-xs font-extrabold uppercase tracking-wider text-ink-soft">Discover</h2>
+          <h2 className="mb-2 font-sans text-sm font-bold text-ink">Discover</h2>
           <ul className="space-y-1.5 font-semibold">
             <li><Link href="/explore">Explore</Link></li>
             <li><Link href="/categories">Categories</Link></li>
@@ -22,14 +22,14 @@ export function SiteFooter() {
           </ul>
         </div>
         <div className="text-sm">
-          <h2 className="mb-2 font-sans text-xs font-extrabold uppercase tracking-wider text-ink-soft">Business</h2>
+          <h2 className="mb-2 font-sans text-sm font-bold text-ink">Business</h2>
           <ul className="space-y-1.5 font-semibold">
             <li><Link href="/business">Claim your listing</Link></li>
             <li><Link href="/business#plans">Plans</Link></li>
           </ul>
         </div>
         <div className="text-sm">
-          <h2 className="mb-2 font-sans text-xs font-extrabold uppercase tracking-wider text-ink-soft">About the data</h2>
+          <h2 className="mb-2 font-sans text-sm font-bold text-ink">About the data</h2>
           <ul className="space-y-1.5 font-semibold">
             <li><Link href="/about">Sources & credits</Link></li>
           </ul>

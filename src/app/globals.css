@@ -196,26 +196,6 @@ h1, h2, h3 {
 /* ---- Motion: small and quick, to confirm what just happened. All of it is switched off by the
    reduced-motion rule at the end of this file. ---- */
 
-/* A new page fades in. Opacity only: a transform here would briefly misplace fixed children. */
-@keyframes page-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-.animate-page { animation: page-in 0.22s ease-out both; }
-
-/* Cards in a list or row arrive one after another. */
-@keyframes rise {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: none; }
-}
-.stagger > * { animation: rise 0.4s cubic-bezier(0.2, 0.8, 0.3, 1) both; }
-.stagger > *:nth-child(2) { animation-delay: 40ms; }
-.stagger > *:nth-child(3) { animation-delay: 80ms; }
-.stagger > *:nth-child(4) { animation-delay: 120ms; }
-.stagger > *:nth-child(5) { animation-delay: 160ms; }
-.stagger > *:nth-child(6) { animation-delay: 200ms; }
-.stagger > *:nth-child(n + 7) { animation-delay: 240ms; }
-
 /* A chip or toggle that has just been switched on gives a small bounce; a saved heart beats once. */
 @keyframes chip-on {
   0% { transform: scale(0.94); }
@@ -229,10 +209,6 @@ h1, h2, h3 {
 }
 [aria-pressed="true"]:not(.no-bounce) { animation: chip-on 0.22s ease-out; }
 [aria-pressed="true"] > svg.lucide-heart { animation: heart-beat 0.35s ease-out; }
-
-/* The picture on a tile leans a little when the tile is hovered or focused. */
-.tilt-on-hover:hover .tilt,
-.tilt-on-hover:focus-visible .tilt { animation: shake 0.5s ease-in-out 1; }
 
 /* Loading placeholders: a soft light sweeps across in place of a plain blink. */
 @keyframes shimmer {

@@ -338,7 +338,7 @@ function Offers({ rec, onSave }: { rec: BusinessRecord; onSave: (r: BusinessReco
         {rec.offers.length === 0 && <li className="rounded-2xl bg-surface-2 p-4 text-ink-soft">No offers or events yet.</li>}
         {rec.offers.map((o) => (
           <li key={o.id} className="flex items-start gap-3 rounded-2xl bg-surface p-4">
-            <span className={cn("rounded-full px-2 py-0.5 text-xs font-extrabold uppercase", o.kind === "offer" ? "bg-accent text-forest" : "bg-surface-2")}>{o.kind}</span>
+            <span className={cn("rounded-full px-2 py-0.5 text-xs font-extrabold", o.kind === "offer" ? "bg-accent text-forest" : "bg-surface-2")}>{o.kind}</span>
             <div className="min-w-0 flex-1">
               <p className="font-bold">{o.title}</p>
               {o.details && <p className="text-sm text-ink-soft">{o.details}</p>}

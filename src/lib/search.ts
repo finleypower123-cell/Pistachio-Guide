@@ -87,8 +87,9 @@ const typosAllowed = (w: string) => (w.length >= 8 ? 2 : w.length >= 5 ? 1 : 0);
 
 /** Free-text match on name, type and address: every word must appear, allowing accents and small typos. */
 export function matchesText(a: Activity, text: string) {
-  // The stock line written for a kind of place isn't about this venue, so it isn't searched.
-  const ownWords = a.summary === blurbFor(a.typeLabel ?? "", a.id) ? "" : a.summary;
+  // The line about a kind of place isn't about this venue, so it isn't searched.
+  const kindLine = blurbFor(a.typeLabel ?? "");
+  const ownWords = kindLine && a.summary.startsWith(kindLine) ? a.summary.slice(kindLine.length) : a.summary;
   const hay = plain(`${a.fullName ?? a.name} ${ownWords} ${CAT[a.category].label} ${a.typeLabel ?? ""} ${a.address ?? ""}`);
   const hayWords = hay.split(/[^a-z0-9]+/).filter(Boolean);
   return plain(text)
