@@ -1,3 +1,4 @@
+import { hoursSentence } from "../src/lib/blurbs";
 import { localName, withLocalName } from "../src/lib/names";
 import { createHash } from "node:crypto";
 import { directThumb, md5 } from "../src/lib/wiki";
@@ -167,7 +168,7 @@ assert.equal(photonToElement({ properties: { osm_id: 1, osm_type: "N", osm_key: 
     const a = el(tags);
     assert.equal(a.category, category, JSON.stringify(tags));
     assert.equal(a.typeLabel, label);
-    assert.ok(blurbFor(label, a.id), `a line of copy exists for ${label}`);
+    assert.ok(blurbFor(label), `a line of copy exists for ${label}`);
     // every kind the fallback asks for is one the mapping understands
   }
   for (const tag of PHOTON_GROUPS.flat()) {
@@ -203,6 +204,28 @@ assert.equal(photonToElement({ properties: { osm_id: 1, osm_type: "N", osm_key: 
   assert.equal(directThumb("https://example.org/a.jpg"), undefined);
 }
 
+// ---- descriptions built from the venue's own record ----
+{
+  const cafe = elementToActivity({ type: "node", id: 301, lat: 1, lon: 1, tags: { amenity: "cafe", name: "Waffelin", "addr:street": "Rue de la Madeleine", "addr:city": "Bruxelles", cuisine: "waffle;coffee_shop", outdoor_seating: "yes", wheelchair: "yes", opening_hours: "Mo-Su 08:00-18:00" } })!;
+  assert.equal(cafe.summary, "A locally run café for coffee and something to eat. Serves waffles and coffee. Outdoor seating and step-free access.");
+  assert.equal(cafe.about, "Waffelin is an independent café on Rue de la Madeleine, Bruxelles. Open every day, 08:00 to 18:00. Serves waffles and coffee. Outdoor seating and step-free access. A locally run café for coffee and something to eat.");
+  const museum = elementToActivity({ type: "node", id: 302, lat: 1, lon: 1, tags: { tourism: "museum", name: "MIM", fee: "no", opening_hours: "Tu-Su 10:00-17:00" } })!;
+  assert.ok(museum.about!.includes("Open Tuesday to Sunday, 10:00 to 17:00.") && museum.about!.includes("Free to get in."), museum.about);
+  const bare = elementToActivity({ type: "node", id: 303, lat: 1, lon: 1, tags: { leisure: "escape_game", name: "Locked" } })!;
+  assert.equal(bare.summary, blurbFor("Escape room"), "no facts: just what this kind of place is");
+  assert.equal(bare.about, "Locked is an escape room. " + blurbFor("Escape room"));
+  assert.equal(hoursSentence(parseOsmHours("Mo-Fr 09:00-17:00; Sa 10:00-14:00")), "Opening hours vary through the week; see below.");
+  assert.equal(hoursSentence(parseOsmHours("Mo,We,Fr 10:00-16:00")), "Open Monday, Wednesday and Friday, 10:00 to 16:00.");
+  assert.equal(hoursSentence(parseOsmHours("Mo-Sa 07:00-23:00; Su 07:30-20:00")), "Open every day, 07:00 to 23:00, except Sunday, 07:30 to 20:00.");
+  const bil = withLocalName({ name: "Mokafé", lat: 50.8467, lng: 4.3525, address: "Galerie du Roi - Koningsgalerij, Bruxelles - Brussel", about: "Mokafé is an independent café on Galerie du Roi - Koningsgalerij, Bruxelles - Brussel." } as { name: string; lat: number; lng: number; address?: string; about?: string }, ["nl"]);
+  assert.equal(bil.address, "Koningsgalerij, Brussel");
+  assert.equal(bil.about, "Mokafé is an independent café on Koningsgalerij, Brussel.");
+  // nothing in any line is a question or a made-up claim about a particular venue
+  for (const label of ["Escape room", "Arcade", "Museum", "Park", "Independent café", "Castle", "Brewery"]) assert.ok(!blurbFor(label)!.includes("?"), label);
+  assert.ok(matchesText(cafe, "waffles"), "the venue's own facts are searchable");
+  assert.ok(!matchesText(bare, "puzzles"), "the kind line is not");
+}
+
 // ---- one language's half of a bilingual Brussels name ----
 {
   const both = "Musée de la Ville de Bruxelles - Museum van de Stad Brussel";
@@ -223,11 +246,11 @@ assert.equal(photonToElement({ properties: { osm_id: 1, osm_type: "N", osm_key: 
 // ---- friendly descriptions ----
 {
   const cafe = elementToActivity({ type: "node", id: 42, lat: 1, lon: 1, tags: { amenity: "cafe", name: "Bean There" } })!;
-  assert.equal(cafe.summary, blurbFor("Independent café", "osm-node-42"), "a line about the kind of place when there is no description");
+  assert.equal(cafe.summary, blurbFor("Independent café"), "a line about the kind of place when there is no description");
   assert.equal(cafe.summary, elementToActivity({ type: "node", id: 42, lat: 1, lon: 1, tags: { amenity: "cafe", name: "Bean There" } })!.summary, "same line every time");
   const own = elementToActivity({ type: "node", id: 43, lat: 1, lon: 1, tags: { amenity: "cafe", name: "X", description: "Cat café with twelve resident cats." } })!;
   assert.equal(own.summary, "Cat café with twelve resident cats.", "the place's own description wins");
-  assert.equal(blurbFor("Something unknown", "osm-node-1"), null);
+  assert.equal(blurbFor("Something unknown"), null);
   // The stock line is not searched: "coffee" in it must not turn a category search into a text match
   assert.ok(!matchesText(cafe, "sweet") && !matchesText(cafe, "chair") && !matchesText(cafe, "people-watching"));
   assert.ok(matchesText(own, "resident cats"), "a real description is searched");

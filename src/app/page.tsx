@@ -51,6 +51,9 @@ function Section({ title, sub, href, children, id }: { title: string; sub?: stri
 /** Place types that make a less ordinary day out, used for the first rail and the hero collage. */
 const UNUSUAL_CATS: CategoryId[] = ["escape", "arcade", "boardgame", "bowling", "golf", "climbing", "trampoline", "water", "themepark", "icerink", "karaoke", "zoo", "boats", "historic", "museum", "art", "market", "vintage"];
 
+/** Bigger outings worth setting time aside for. */
+const DAY_OUT_CATS: CategoryId[] = ["historic", "zoo", "themepark", "boats", "icerink", "water", "brewery"];
+
 function Rail({ items }: { items: Activity[] }) {
   const { osmStatus, retryOsm } = useApp();
   if (!items.length && (osmStatus === "loading" || osmStatus === "idle"))
@@ -69,7 +72,7 @@ function Rail({ items }: { items: Activity[] }) {
     );
   if (!items.length) return <p className="rounded-2xl bg-surface-2 p-5 text-ink-soft">Nothing here near this location yet.</p>;
   return (
-    <div className="rail stagger">
+    <div className="rail">
       {items.map((a, i) => (
         <ActivityCard key={a.id} a={a} priority={i < 2} />
       ))}
@@ -106,6 +109,8 @@ export default function Home() {
   const under20 = top((a) => a.price != null && a.price > 0 && a.price < 20);
   const date = top((a) => a.tags.includes("date"));
   const weird = top((a) => a.tags.includes("weird"), 5);
+  const dayOut = top((a) => DAY_OUT_CATS.includes(a.category));
+  const littleOnes = top((a) => a.category === "softplay" || a.category === "zoo" || a.category === "trampoline" || (a.category === "park" && a.tags.includes("family")));
   const featured = near.filter((a) => a.sponsored);
   const deals = near.filter((a) => a.deal);
   const collage = SHOW_DEMO
@@ -121,19 +126,13 @@ export default function Home() {
       <section className="relative overflow-hidden">
         <div className="gutter mx-auto grid max-w-7xl items-center gap-10 pb-6 pt-8 md:pt-14 lg:grid-cols-[1.1fr_0.9fr]">
           <div>
-            <p className="mb-4 inline-flex items-center gap-2 rounded-full bg-surface-2 px-3 py-1.5 text-sm font-bold">
-              <Sparkles className="size-4 text-accent-ink" /> Find the fun stuff
-            </p>
-            <h1 className="text-[2.9rem] font-extrabold leading-[0.98] sm:text-6xl lg:text-[5.2rem]">
-              Your city has{" "}
-              <span className="relative whitespace-nowrap">
-                <span className="relative z-10">more fun</span>
-                <span className="absolute inset-x-[-4px] bottom-[0.08em] z-0 h-[0.36em] rounded-full bg-accent" aria-hidden />
-              </span>{" "}
-              than you think.
+            <h1 className="text-[2.6rem] font-extrabold leading-[1.02] sm:text-6xl lg:text-[4.6rem]">
+              Find the fun stuff in {place.label}.
             </h1>
-            <p className="mt-5 max-w-xl text-lg text-ink-soft md:text-xl">
-              Find hidden gems, weird little adventures and brilliant things to do near you.
+            <p className="mt-4 max-w-xl text-lg text-ink-soft md:text-xl">
+              {near.length > 0
+                ? `${near.length} places within 5 km, from escape rooms and arcades to independent cafés and parks.`
+                : "Escape rooms, arcades, independent cafés, parks and more, close to where you are."}
             </p>
 
             <form
@@ -210,14 +209,14 @@ export default function Home() {
         </div>
       </section>
 
-      <Section title="A little bit weird, a lot of fun." sub="Arcades, escape rooms, odd little museums and markets you walk past every day." href={SHOW_DEMO ? "/explore?tag=weird" : `/explore?cat=${UNUSUAL_CATS.join(",")}`}>
+      <Section title="A little bit weird, a lot of fun." sub="Arcades, escape rooms, odd museums and markets near you." href={SHOW_DEMO ? "/explore?tag=weird" : `/explore?cat=${UNUSUAL_CATS.join(",")}`}>
         <Rail items={unusual} />
       </Section>
 
       <Section title="Fancy doing something different?" sub="Pick how you feel. We'll handle the rest.">
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
           {moods.map((m, i) => (
-            <Link key={m.id} href={`/explore?mood=${m.id}`} className={`group flex items-center gap-3 overflow-hidden rounded-[22px] p-3 transition hover:-translate-y-0.5 ${i % 3 === 0 ? "bg-accent text-forest" : i % 3 === 1 ? "bg-surface shadow-card" : "bg-forest text-cream"}`}>
+            <Link key={m.id} href={`/explore?mood=${m.id}`} className={`group flex items-center gap-3 overflow-hidden rounded-[22px] p-3 ${i % 3 === 0 ? "bg-accent text-forest" : i % 3 === 1 ? "bg-surface shadow-card" : "bg-forest text-cream"}`}>
               <span className="block size-14 shrink-0 overflow-hidden rounded-2xl md:size-16">
                 <ActivityArt activity={{ id: `mood-${m.id}`, category: m.icon, name: m.label }} />
               </span>
@@ -230,7 +229,7 @@ export default function Home() {
         </div>
       </Section>
 
-      <Section title="Get off the sofa. It's free." sub="Good times that cost nothing at all." href="/explore?price=free">
+      <Section title="Get off the sofa. It's free." sub="Parks, free museums and other places that cost nothing to visit." href="/explore?price=free">
         <Rail items={free} />
       </Section>
 
@@ -258,7 +257,7 @@ export default function Home() {
         </section>
       )}
 
-      <Section title="Rainy day? Sorted." sub="Warm, dry and actually fun." href="/explore?setting=indoor">
+      <Section title="For a rainy day" sub="Indoor places nearby." href="/explore?setting=indoor">
         <Rail items={rainy} />
       </Section>
 
@@ -266,9 +265,22 @@ export default function Home() {
         <Rail items={gems} />
       </Section>
 
+      {/* These kinds of place are rarer, so each row appears only when there are a few nearby. */}
+      {dayOut.length >= 3 && (
+        <Section title="Make a day of it" sub="Castles, zoos, boat hire and breweries worth setting a day aside for." href={`/explore?cat=${DAY_OUT_CATS.join(",")}`}>
+          <Rail items={dayOut} />
+        </Section>
+      )}
+
+      {littleOnes.length >= 3 && (
+        <Section title="For the little ones" sub="Soft play, animals and space to run about." href="/explore?cat=softplay,zoo,trampoline">
+          <Rail items={littleOnes} />
+        </Section>
+      )}
+
       {/* Prices and "date" or "weird" labels come from business listings, so these appear once some exist nearby. */}
       {under20.length > 0 && (
-        <Section title="Under £20" sub="Good times that won't wreck your week." href="/explore?max=19">
+        <Section title="Under £20" sub="Places with a listed price under £20." href="/explore?max=19">
           <Rail items={under20} />
         </Section>
       )}
@@ -280,13 +292,13 @@ export default function Home() {
       )}
 
       {weird.length > 0 && (
-      <Section title="Something weird" sub="The stuff you'll be telling people about." href="/explore?tag=weird">
+      <Section title="Something weird" href="/explore?tag=weird">
         {weird.length > 0 && (
           <div className="grid gap-4 lg:grid-cols-[1.3fr_1fr]">
             <Link href={`/activity/${weird[0].id}`} className="group relative overflow-hidden rounded-[28px] bg-forest text-cream">
               <span className="block aspect-[16/10] overflow-hidden opacity-90"><ActivityArt activity={weird[0]} className="transition duration-700 group-hover:scale-105" /></span>
               <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-[#14231a] to-transparent p-6 pt-20">
-                <span className="block text-xs font-extrabold uppercase tracking-wider text-pistachio">{CAT[weird[0].category].short}</span>
+                <span className="block text-xs font-extrabold text-pistachio">{CAT[weird[0].category].short}</span>
                 <span className="mt-1 block font-display text-3xl font-bold">{weird[0].name}</span>
                 <span className="mt-1 block max-w-md text-sm opacity-85">{weird[0].special ?? weird[0].summary}</span>
               </span>

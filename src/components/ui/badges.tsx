@@ -1,7 +1,7 @@
 import { cn, priceLabel } from "@/lib/utils";
 import type { Activity } from "@/lib/types";
 
-const pill = "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-wide";
+const pill = "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold";
 
 export function SourceBadge({ a, className }: { a: Activity; className?: string }) {
   if (a.source === "osm")

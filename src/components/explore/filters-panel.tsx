@@ -20,7 +20,7 @@ function Seg<T extends string | number>({
 }) {
   return (
     <fieldset>
-      <legend className="mb-2 text-[13px] font-extrabold uppercase tracking-wider text-ink-soft">{label}</legend>
+      <legend className="mb-2 text-[15px] font-bold text-ink">{label}</legend>
       <div className="flex flex-wrap gap-1.5">
         {options.map(([v, l]) => (
           <button
@@ -85,7 +85,7 @@ export function FiltersPanel() {
       />
       {(has.paid || f.maxPrice < 50) && (
         <div>
-          <label htmlFor="f-maxprice" className="mb-2 flex justify-between text-[13px] font-extrabold uppercase tracking-wider text-ink-soft">
+          <label htmlFor="f-maxprice" className="mb-2 flex justify-between text-[15px] font-bold text-ink">
             Budget per person <span className="text-ink tabular">{f.maxPrice >= 50 ? "Any" : `Up to £${f.maxPrice}`}</span>
           </label>
           <input id="f-maxprice" type="range" min={0} max={50} step={1} value={f.maxPrice} onChange={(e) => set("maxPrice", Number(e.target.value))} className="w-full accent-[var(--primary)]" />
@@ -112,7 +112,7 @@ export function FiltersPanel() {
       )}
       {collections.length > 0 && (
       <fieldset>
-        <legend className="mb-2 text-[13px] font-extrabold uppercase tracking-wider text-ink-soft">Collections</legend>
+        <legend className="mb-2 text-[15px] font-bold text-ink">Collections</legend>
         <div className="flex flex-wrap gap-1.5">
           {collections.map((c) => (
             <button key={c.id} type="button" aria-pressed={f.tags.includes(c.id)} onClick={() => toggleTag(c.id)}
@@ -124,7 +124,7 @@ export function FiltersPanel() {
       </fieldset>
       )}
       <fieldset>
-        <legend className="mb-2 text-[13px] font-extrabold uppercase tracking-wider text-ink-soft">Activity type</legend>
+        <legend className="mb-2 text-[15px] font-bold text-ink">Activity type</legend>
         <div className="flex flex-wrap gap-1.5">
           {categories.map((c) => (
             <button key={c.id} type="button" aria-pressed={f.categories.includes(c.id)} onClick={() => toggleCat(c.id)}
@@ -136,7 +136,7 @@ export function FiltersPanel() {
       </fieldset>
       {SHOW_DEMO && (
         <fieldset>
-          <legend className="mb-2 text-[13px] font-extrabold uppercase tracking-wider text-ink-soft">Sources</legend>
+          <legend className="mb-2 text-[15px] font-bold text-ink">Sources</legend>
           <div className="flex flex-col gap-1">
             <Toggle id="f-osm" label="Real places (OpenStreetMap)" checked={f.sources.osm} onChange={(v) => set("sources", { ...f.sources, osm: v })} />
             <Toggle id="f-demo" label="Demo listings" checked={f.sources.demo} onChange={(v) => set("sources", { ...f.sources, demo: v })} />

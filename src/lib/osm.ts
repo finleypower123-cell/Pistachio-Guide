@@ -1,4 +1,4 @@
-import { blurbFor } from "./blurbs";
+import { blurbFor, hoursSentence, introSentence, venueFacts } from "./blurbs";
 import { CAT } from "./categories";
 import { parseOsmHours } from "./hours";
 import type { Activity, CategoryId, Tag } from "./types";
@@ -194,10 +194,22 @@ export function elementToActivity(el: OsmElement): Activity | null {
           ? "Not wheelchair accessible, according to OpenStreetMap."
           : "Accessibility isn't recorded in OpenStreetMap yet. Check with the venue.";
 
-  // The place's own description when OpenStreetMap has one; otherwise a line about this kind of place.
+  // Cards: the place's own description when OpenStreetMap has one; otherwise what this kind of
+  // place is, followed by any facts its record holds. The place page adds a fuller paragraph.
   const id = `osm-${el.type}-${el.id}`;
-  const where = t["addr:street"] ? ` on ${t["addr:street"]}` : "";
-  const summary = t.description ? t.description.slice(0, 180) : (blurbFor(m.typeLabel, id) ?? `${m.typeLabel}${where}.`);
+  const kind = blurbFor(m.typeLabel);
+  const facts = venueFacts(t);
+  const summary = t.description ? t.description.slice(0, 180) : [kind ?? `${m.typeLabel}.`, facts].filter(Boolean).join(" ");
+  const parsedHours = parseOsmHours(t.opening_hours);
+  const about = [
+    introSentence(t.name!, m.typeLabel, t["addr:street"], t["addr:city"]),
+    t.description,
+    hoursSentence(parsedHours),
+    facts,
+    kind,
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   const website = t.website ?? t["contact:website"];
   const hoursRaw = t.opening_hours;
@@ -217,9 +229,10 @@ export function elementToActivity(el: OsmElement): Activity | null {
     accessible,
     accessNote,
     tags,
-    hours: parseOsmHours(hoursRaw),
+    hours: parsedHours,
     openingHoursRaw: hoursRaw,
     summary,
+    about,
     booking: free ? "free" : website ? "venue" : "unknown",
     website,
     phone: t.phone ?? t["contact:phone"],

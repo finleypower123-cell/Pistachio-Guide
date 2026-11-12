@@ -8,7 +8,7 @@
  */
 import { mkdirSync, writeFileSync } from "node:fs";
 import { CITIES, CITY_DATA_RADIUS_KM, type CityData } from "../src/lib/cities";
-import { photonNearby } from "../src/lib/places-fallback";
+import { photonNearby, withFullRecords } from "../src/lib/places-fallback";
 import { loadAreaPhotos, withAreaPhotos } from "../src/lib/wiki";
 
 const OUT = "public/data/cities";
@@ -21,12 +21,15 @@ async function main() {
     const started = Date.now();
     try {
       const centre = { lat: city.lat, lng: city.lng };
-      const places = await photonNearby(city.lat, city.lng, CITY_DATA_RADIUS_KM * 1000);
-      if (places.length < 20) throw new Error(`only ${places.length} places came back`);
+      const basic = await photonNearby(city.lat, city.lng, CITY_DATA_RADIUS_KM * 1000);
+      if (basic.length < 20) throw new Error(`only ${basic.length} places came back`);
+      // Opening hours, websites and other details, so cards and filters can use them.
+      const places = await withFullRecords(basic);
+      const full = places.filter((p) => !p.partial).length;
       const photos = await loadAreaPhotos(places, centre, CITY_DATA_RADIUS_KM).catch(() => ({}));
       const data: CityData = { builtAt: new Date().toISOString(), centre, radiusKm: CITY_DATA_RADIUS_KM, places: withAreaPhotos(places, photos), photos };
       writeFileSync(`${OUT}/${city.slug}.json`, JSON.stringify(data));
-      console.log(`${city.slug}: ${places.length} places, ${Object.keys(photos).length} photos, ${Math.round((Date.now() - started) / 1000)}s`);
+      console.log(`${city.slug}: ${places.length} places (${full} full records, ${places.filter((p) => p.hours).length} with hours), ${Object.keys(photos).length} photos, ${Math.round((Date.now() - started) / 1000)}s`);
     } catch (e) {
       failed++;
       console.log(`${city.slug}: FAILED, previous file kept (${String(e).slice(0, 120)})`);

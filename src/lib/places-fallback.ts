@@ -175,3 +175,41 @@ export async function osmApiPlace(type: "node" | "way" | "relation", id: number,
   }
   return elementToActivity({ type, id, lat, lon, tags: main.tags });
 }
+
+/**
+ * Full OpenStreetMap records for many places at once, by id: one request per 150 ids of a kind.
+ * Used by the weekly city-data build (never by visitors' browsers) to turn basic Photon results
+ * into full records with opening hours, websites and the rest. Places whose record can't be
+ * fetched come back unchanged. Coordinates are kept from the input, since a way's record has none.
+ */
+export async function withFullRecords(places: Activity[], signal?: AbortSignal): Promise<Activity[]> {
+  const byType: Record<"node" | "way" | "relation", number[]> = { node: [], way: [], relation: [] };
+  for (const p of places) if (p.osm) byType[p.osm.type].push(p.osm.id);
+  const tags = new Map<string, Record<string, string>>();
+  for (const type of ["node", "way", "relation"] as const) {
+    const ids = byType[type];
+    for (let i = 0; i < ids.length; i += 150) {
+      const chunk = ids.slice(i, i + 150);
+      try {
+        const j = await getJson<{ elements?: OsmApiElement[] }>(`${OSM_API}/${type}s.json?${type}s=${chunk.join(",")}`, 20000, signal);
+        for (const e of j.elements ?? []) if (e.tags) tags.set(`${type}-${e.id}`, e.tags);
+      } catch {
+        // A chunk that fails keeps its basic records; the rest still improve.
+      }
+    }
+  }
+  return places.map((p) => {
+    const t = p.osm && tags.get(`${p.osm.type}-${p.osm.id}`);
+    if (!t || !p.osm) return p;
+    // Photon works out a street and town for places whose record has no address of its own; keep those.
+    const merged = { ...t };
+    if (!merged["addr:street"] && p.address) {
+      const [street, city] = p.address.split(",").map((x) => x.trim());
+      if (street) merged["addr:street"] = street;
+      if (city && !merged["addr:city"]) merged["addr:city"] = city;
+    }
+    const full = elementToActivity({ type: p.osm.type, id: p.osm.id, lat: p.lat, lon: p.lng, tags: merged });
+    // A record can change kind since Photon indexed it (a café that became a bar); keep only matches.
+    return full && full.category === p.category ? full : p;
+  });
+}

@@ -23,21 +23,28 @@ export function ActivityCard({ a, className, compact = false, row = false, prior
   const km = distanceKm(place, a);
   const status = a.hours ? openStatus(a.hours) : null;
   return (
-    <article className={cn("group relative flex overflow-hidden rounded-[22px] bg-surface shadow-card transition hover:-translate-y-0.5", row ? "flex-row sm:flex-col" : "flex-col", className)}>
+    // On phones a list is a plain list: rows divided by a line, a square picture, no card around each.
+    <article
+      className={cn(
+        "group relative flex overflow-hidden rounded-[22px] bg-surface shadow-card",
+        row ? "flex-row items-start max-sm:rounded-none max-sm:border-b max-sm:border-line max-sm:bg-transparent max-sm:py-3.5 max-sm:shadow-none sm:flex-col" : "flex-col",
+        className,
+      )}
+    >
       <Link href={`/activity/${a.id}`} className="absolute inset-0 z-[1]" aria-label={a.name} />
-      <div className={cn("relative overflow-hidden", row ? "w-28 shrink-0 self-stretch sm:aspect-[4/3] sm:w-auto" : compact ? "aspect-[16/10]" : "aspect-[4/3]")}>
-        <ActivityArt activity={a} sizes={row ? "(max-width: 640px) 112px, 420px" : "320px"} priority={priority} className="transition duration-500 group-hover:scale-[1.03]" />
+      <div className={cn("relative overflow-hidden", row ? "size-[92px] shrink-0 max-sm:rounded-2xl sm:aspect-[4/3] sm:size-auto" : compact ? "aspect-[16/10]" : "aspect-[4/3]")}>
+        <ActivityArt activity={a} sizes={row ? "(max-width: 640px) 112px, 420px" : "320px"} priority={priority} />
         {a.photoCredits?.[0] && <PhotoCreditMark credit={a.photoCredits[0]} className="absolute bottom-1.5 right-1.5 z-[2]" />}
-        <div className={cn("absolute flex flex-wrap gap-1.5", row ? "left-2 top-2 sm:left-3 sm:top-3" : "left-3 top-3")}>
+        <div className={cn("absolute flex flex-wrap gap-1.5", row ? "left-1.5 top-1.5 sm:left-3 sm:top-3" : "left-3 top-3")}>
           <PriceBadge a={a} />
           {a.sponsored && <SponsoredBadge />}
           {a.deal && <DealBadge />}
         </div>
       </div>
-      <SaveButton a={a} className={cn("absolute", row ? "right-2 top-2 sm:right-3 sm:top-3" : "right-3 top-3")} />
-      <div className={cn("flex min-w-0 flex-1 flex-col gap-1.5", row ? "p-3 pr-14 sm:p-4" : "p-4")}>
+      <SaveButton a={a} className={cn("absolute", row ? "right-0 top-2.5 max-sm:bg-transparent max-sm:shadow-none sm:right-3 sm:top-3" : "right-3 top-3")} />
+      <div className={cn("flex min-w-0 flex-1 flex-col gap-1.5", row ? "py-0 pl-3.5 pr-12 sm:p-4" : "p-4")}>
         <div className="flex items-center justify-between gap-2">
-          <span className="truncate text-[12px] font-bold uppercase tracking-wider text-ink-soft">
+          <span className="truncate text-[12px] font-bold text-ink-soft">
             {a.typeLabel ?? CAT[a.category].short}
           </span>
           {/* Every place on the live site is real, so only verified business listings need a badge. */}
@@ -53,6 +60,7 @@ export function ActivityCard({ a, className, compact = false, row = false, prior
             </span>
           )}
           <span>{formatDistance(km)}</span>
+          {a.address && <span className="min-w-0 max-w-[14rem] truncate">{a.address.split(",")[0]}</span>}
           {status && status.open !== null && <span className={status.open ? "text-accent-ink" : undefined}>{status.text}</span>}
           {a.price != null && <span className="ml-auto text-ink">{priceLabel(a.price)}</span>}
         </div>

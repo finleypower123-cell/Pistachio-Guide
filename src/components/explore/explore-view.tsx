@@ -36,7 +36,7 @@ function MapPreview({ a, onClose }: { a: Activity; onClose: () => void }) {
       </div>
       <div className="min-w-0 flex-1 py-1 pr-8">
         <div className="flex items-center gap-1.5">
-          <span className="truncate text-[11px] font-extrabold uppercase tracking-wider text-ink-soft">{a.typeLabel ?? CAT[a.category].short}</span>
+          <span className="truncate text-[11px] font-extrabold text-ink-soft">{a.typeLabel ?? CAT[a.category].short}</span>
           <SourceBadge a={a} />
         </div>
         <h3 className="mt-0.5 truncate text-lg font-bold">{a.name}</h3>
@@ -331,7 +331,7 @@ export function ExploreView({ initialView = "list" }: { initialView?: "list" | "
             </div>
           ) : view === "list" ? (
             <>
-              <div className="stagger grid gap-3 sm:grid-cols-2 sm:gap-5 xl:grid-cols-3">
+              <div className="grid sm:grid-cols-2 sm:gap-5 xl:grid-cols-3">
                 {results.slice(0, visible).map((a, i) => (
                   <ActivityCard key={a.id} a={a} row priority={i < 5} />
                 ))}

@@ -30,9 +30,9 @@ export default function CategoriesPage() {
       {collections.length > 0 && (
         <>
           <h2 className="mb-4 mt-10 text-2xl font-extrabold">Collections</h2>
-          <div className="stagger grid grid-cols-2 gap-3 md:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
             {collections.map((c) => (
-              <Link key={c.id} href={`/explore?tag=${c.id}`} className="rounded-[20px] bg-forest p-4 text-cream transition hover:-translate-y-0.5">
+              <Link key={c.id} href={`/explore?tag=${c.id}`} className="rounded-[20px] bg-forest p-4 text-cream">
                 <span className="block font-display text-lg font-bold leading-tight">{c.label}</span>
                 <span className="mt-1 block text-xs opacity-80">{c.blurb}</span>
               </Link>
@@ -43,11 +43,11 @@ export default function CategoriesPage() {
 
       <h2 className="mb-4 mt-10 text-2xl font-extrabold">Kinds of place</h2>
       {tiles.length > 0 ? (
-        <div className="stagger grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           {tiles.map(({ c, n }) => (
-            <Link key={c.id} href={`/explore?cat=${c.id}`} className="tilt-on-hover group overflow-hidden rounded-[22px] bg-surface shadow-card transition hover:-translate-y-0.5">
+            <Link key={c.id} href={`/explore?cat=${c.id}`} className="group overflow-hidden rounded-[22px] bg-surface shadow-card">
               <span className="block aspect-[16/10] overflow-hidden">
-                <ActivityArt activity={{ id: `cat-${c.id}`, category: c.id, name: c.label }} className="tilt transition duration-500 group-hover:scale-105" />
+                <ActivityArt activity={{ id: `cat-${c.id}`, category: c.id, name: c.label }} className="" />
               </span>
               <span className="flex items-center justify-between gap-2 p-3.5">
                 <span className="font-bold leading-tight">{c.label}</span>
