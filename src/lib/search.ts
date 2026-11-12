@@ -89,7 +89,7 @@ const typosAllowed = (w: string) => (w.length >= 8 ? 2 : w.length >= 5 ? 1 : 0);
 export function matchesText(a: Activity, text: string) {
   // The stock line written for a kind of place isn't about this venue, so it isn't searched.
   const ownWords = a.summary === blurbFor(a.typeLabel ?? "", a.id) ? "" : a.summary;
-  const hay = plain(`${a.name} ${ownWords} ${CAT[a.category].label} ${a.typeLabel ?? ""} ${a.address ?? ""}`);
+  const hay = plain(`${a.fullName ?? a.name} ${ownWords} ${CAT[a.category].label} ${a.typeLabel ?? ""} ${a.address ?? ""}`);
   const hayWords = hay.split(/[^a-z0-9]+/).filter(Boolean);
   return plain(text)
     .split(/\s+/)
