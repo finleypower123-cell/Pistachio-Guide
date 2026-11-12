@@ -51,6 +51,9 @@ function Section({ title, sub, href, children, id }: { title: string; sub?: stri
 /** Place types that make a less ordinary day out, used for the first rail and the hero collage. */
 const UNUSUAL_CATS: CategoryId[] = ["escape", "arcade", "boardgame", "bowling", "golf", "climbing", "trampoline", "water", "themepark", "icerink", "karaoke", "zoo", "boats", "historic", "museum", "art", "market", "vintage"];
 
+/** Bigger outings worth setting time aside for. */
+const DAY_OUT_CATS: CategoryId[] = ["historic", "zoo", "themepark", "boats", "icerink", "water", "brewery"];
+
 function Rail({ items }: { items: Activity[] }) {
   const { osmStatus, retryOsm } = useApp();
   if (!items.length && (osmStatus === "loading" || osmStatus === "idle"))
@@ -106,6 +109,8 @@ export default function Home() {
   const under20 = top((a) => a.price != null && a.price > 0 && a.price < 20);
   const date = top((a) => a.tags.includes("date"));
   const weird = top((a) => a.tags.includes("weird"), 5);
+  const dayOut = top((a) => DAY_OUT_CATS.includes(a.category));
+  const littleOnes = top((a) => a.category === "softplay" || a.category === "zoo" || a.category === "trampoline" || (a.category === "park" && a.tags.includes("family")));
   const featured = near.filter((a) => a.sponsored);
   const deals = near.filter((a) => a.deal);
   const collage = SHOW_DEMO
@@ -265,6 +270,19 @@ export default function Home() {
       <Section title="Hidden gems worth finding" sub="Independent cafés, small venues and one-of-a-kind shops." href="/explore?tag=gem">
         <Rail items={gems} />
       </Section>
+
+      {/* These kinds of place are rarer, so each row appears only when there are a few nearby. */}
+      {dayOut.length >= 3 && (
+        <Section title="Make a day of it" sub="Castles, zoos, boats, breweries and other excuses to get out." href={`/explore?cat=${DAY_OUT_CATS.join(",")}`}>
+          <Rail items={dayOut} />
+        </Section>
+      )}
+
+      {littleOnes.length >= 3 && (
+        <Section title="For the little ones" sub="Soft play, animals and space to run about." href="/explore?cat=softplay,zoo,trampoline">
+          <Rail items={littleOnes} />
+        </Section>
+      )}
 
       {/* Prices and "date" or "weird" labels come from business listings, so these appear once some exist nearby. */}
       {under20.length > 0 && (
