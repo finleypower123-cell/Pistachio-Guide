@@ -201,7 +201,14 @@ export async function withFullRecords(places: Activity[], signal?: AbortSignal):
   return places.map((p) => {
     const t = p.osm && tags.get(`${p.osm.type}-${p.osm.id}`);
     if (!t || !p.osm) return p;
-    const full = elementToActivity({ type: p.osm.type, id: p.osm.id, lat: p.lat, lon: p.lng, tags: t });
+    // Photon works out a street and town for places whose record has no address of its own; keep those.
+    const merged = { ...t };
+    if (!merged["addr:street"] && p.address) {
+      const [street, city] = p.address.split(",").map((x) => x.trim());
+      if (street) merged["addr:street"] = street;
+      if (city && !merged["addr:city"]) merged["addr:city"] = city;
+    }
+    const full = elementToActivity({ type: p.osm.type, id: p.osm.id, lat: p.lat, lon: p.lng, tags: merged });
     // A record can change kind since Photon indexed it (a café that became a bar); keep only matches.
     return full && full.category === p.category ? full : p;
   });

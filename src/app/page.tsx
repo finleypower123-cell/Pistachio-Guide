@@ -126,19 +126,13 @@ export default function Home() {
       <section className="relative overflow-hidden">
         <div className="gutter mx-auto grid max-w-7xl items-center gap-10 pb-6 pt-8 md:pt-14 lg:grid-cols-[1.1fr_0.9fr]">
           <div>
-            <p className="mb-4 inline-flex items-center gap-2 rounded-full bg-surface-2 px-3 py-1.5 text-sm font-bold">
-              <Sparkles className="size-4 text-accent-ink" /> Find the fun stuff
-            </p>
-            <h1 className="text-[2.9rem] font-extrabold leading-[0.98] sm:text-6xl lg:text-[5.2rem]">
-              Your city has{" "}
-              <span className="relative whitespace-nowrap">
-                <span className="relative z-10">more fun</span>
-                <span className="absolute inset-x-[-4px] bottom-[0.08em] z-0 h-[0.36em] rounded-full bg-accent" aria-hidden />
-              </span>{" "}
-              than you think.
+            <h1 className="text-[2.6rem] font-extrabold leading-[1.02] sm:text-6xl lg:text-[4.6rem]">
+              Find the fun stuff in {place.label}.
             </h1>
-            <p className="mt-5 max-w-xl text-lg text-ink-soft md:text-xl">
-              Find hidden gems, weird little adventures and brilliant things to do near you.
+            <p className="mt-4 max-w-xl text-lg text-ink-soft md:text-xl">
+              {near.length > 0
+                ? `${near.length} places within 5 km, from escape rooms and arcades to independent cafés and parks.`
+                : "Escape rooms, arcades, independent cafés, parks and more, close to where you are."}
             </p>
 
             <form

@@ -41,7 +41,7 @@ export function ActivityCard({ a, className, compact = false, row = false, prior
           {a.deal && <DealBadge />}
         </div>
       </div>
-      <SaveButton a={a} className={cn("absolute", row ? "right-0 top-2.5 sm:right-3 sm:top-3" : "right-3 top-3")} />
+      <SaveButton a={a} className={cn("absolute", row ? "right-0 top-2.5 max-sm:bg-transparent max-sm:shadow-none sm:right-3 sm:top-3" : "right-3 top-3")} />
       <div className={cn("flex min-w-0 flex-1 flex-col gap-1.5", row ? "py-0 pl-3.5 pr-12 sm:p-4" : "p-4")}>
         <div className="flex items-center justify-between gap-2">
           <span className="truncate text-[12px] font-bold text-ink-soft">

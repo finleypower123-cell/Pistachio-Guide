@@ -92,7 +92,7 @@ export function venueFacts(t: Record<string, string>): string {
   if (serves.length) out.push(`Serves ${list([...new Set(serves)].slice(0, 3))}.`);
   const extras: string[] = [];
   if (t.outdoor_seating === "yes") extras.push("outdoor seating");
-  if (t.internet_access === "wlan" || t.internet_access === "yes") extras.push("wifi");
+  if (t.amenity === "cafe" && (t.internet_access === "wlan" || t.internet_access === "yes")) extras.push("wifi");
   if (t.wheelchair === "yes") extras.push("step-free access");
   if (extras.length) out.push(`${list(extras)[0].toUpperCase()}${list(extras).slice(1)}.`);
   if (t.fee === "no") out.push("Free to get in.");

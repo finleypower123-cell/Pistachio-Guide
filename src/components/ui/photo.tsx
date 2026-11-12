@@ -70,9 +70,10 @@ export function PhotoCreditMark({ credit, className }: { credit: PhotoCredit; cl
       target="_blank"
       rel="noopener noreferrer"
       title={["Photo", credit.by && `by ${credit.by}`, credit.license, "via Wikimedia Commons"].filter(Boolean).join(" · ")}
-      className={cn("rounded-full bg-black/55 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white/95 hover:bg-black/75", className)}
+      className={cn("grid size-5 place-items-center rounded-full bg-black/45 text-[11px] font-semibold leading-none text-white/95 hover:bg-black/70", className)}
     >
-      Wikimedia<span className="sr-only"> Commons photo credit</span>
+      <span aria-hidden>©</span>
+      <span className="sr-only">Photo credit, Wikimedia Commons</span>
     </a>
   );
 }
