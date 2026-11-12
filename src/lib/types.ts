@@ -70,6 +70,18 @@ export interface PhotoCredit {
   license?: string;
 }
 
+/** A description written by someone who knows the place: its Wikipedia article or its own website. */
+export interface PlaceDescription {
+  text: string;
+  /** Language of the text, e.g. "en" or "fr" */
+  lang?: string;
+  source: "wikipedia" | "website";
+  /** Where it came from, for the credit */
+  url: string;
+  /** Wikipedia article title */
+  title?: string;
+}
+
 export interface Activity {
   id: string;
   source: Source;
@@ -115,6 +127,10 @@ export interface Activity {
   photos?: string[];
   /** Credits for `photos`, by position. Present for photos from Wikimedia Commons, which require one. */
   photoCredits?: (PhotoCredit | undefined)[];
+  /** A tiny blurred version of the first photo as a data URL, shown at once while the photo loads */
+  photoBlur?: string;
+  /** Real description from Wikipedia or the venue's website, added by the weekly city build */
+  description?: PlaceDescription;
   /** Wikipedia, Wikidata and Commons links from the OpenStreetMap record, used to find photos and a description */
   wiki?: WikiRef;
   /** OSM reference for attribution and edit links */

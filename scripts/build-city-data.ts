@@ -13,6 +13,7 @@ import { loadAreaPhotos, withAreaPhotos } from "../src/lib/wiki";
 import { fullHours } from "../src/lib/hours-full";
 import { setFullHoursParser } from "../src/lib/osm";
 import { mergeOverture, type OverturePlace } from "../src/lib/overture";
+import { withDescriptions, withPhotoBlurs } from "../src/lib/enrich";
 
 setFullHoursParser(fullHours);
 
@@ -24,6 +25,16 @@ if (process.argv[2] === "--list") {
   // For scripts/overture_places.py: which areas to download.
   console.log(JSON.stringify(CITIES.map((c) => ({ slug: c.slug, lat: c.lat, lng: c.lng, radiusKm: CITY_DATA_RADIUS_KM }))));
   process.exit(0);
+}
+
+/** Photo previews from last week's file, so they don't all have to be fetched again. */
+function previousBlurs(slug: string): Map<string, string> {
+  const known = new Map<string, string>();
+  try {
+    const old = JSON.parse(readFileSync(`${OUT}/${slug}.json`, "utf8")) as CityData;
+    for (const p of old.places) if (p.photos?.[0] && p.photoBlur) known.set(p.photos[0], p.photoBlur);
+  } catch {}
+  return known;
 }
 
 function overtureFor(slug: string): { release?: string; places: OverturePlace[] } | null {
@@ -54,18 +65,21 @@ async function main() {
       const merged = ovt ? mergeOverture(osmPlaces, ovt.places, city.slug) : null;
       const places = merged?.places ?? osmPlaces;
       const photos = await loadAreaPhotos(places, centre, CITY_DATA_RADIUS_KM).catch(() => ({}));
+      // Real descriptions (Wikipedia, else the venue's website) and blurred previews of the photos.
+      const described = await withDescriptions(withAreaPhotos(places, photos));
+      const blurred = await withPhotoBlurs(described.places, previousBlurs(city.slug));
       const data: CityData = {
         builtAt: new Date().toISOString(),
         centre,
         radiusKm: CITY_DATA_RADIUS_KM,
-        places: withAreaPhotos(places, photos),
+        places: blurred.places,
         photos,
         ...(ovt?.release ? { overtureRelease: ovt.release } : {}),
       };
       writeFileSync(`${OUT}/${city.slug}.json`, JSON.stringify(data));
       const fromOverture = merged ? `, Overture: ${merged.added} added, ${merged.enriched} given links` : ", no Overture file";
       console.log(
-        `${city.slug}: ${places.length} places (${full} full OSM records, ${places.filter((p) => p.hours).length} with hours, ${places.filter((p) => p.hoursDetail).length} with breaks)${fromOverture}, ${Object.keys(photos).length} photos, ${Math.round((Date.now() - started) / 1000)}s`,
+        `${city.slug}: ${places.length} places (${full} full OSM records, ${places.filter((p) => p.hours).length} with hours, ${places.filter((p) => p.hoursDetail).length} with breaks)${fromOverture}, ${Object.keys(photos).length} photos (${blurred.blurred} with previews), descriptions: ${described.wikipedia} Wikipedia + ${described.website} websites, ${Math.round((Date.now() - started) / 1000)}s`,
       );
     } catch (e) {
       failed++;
