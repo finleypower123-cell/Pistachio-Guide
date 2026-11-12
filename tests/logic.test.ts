@@ -216,6 +216,10 @@ assert.equal(photonToElement({ properties: { osm_id: 1, osm_type: "N", osm_key: 
   assert.equal(bare.about, "Locked is an escape room. " + blurbFor("Escape room"));
   assert.equal(hoursSentence(parseOsmHours("Mo-Fr 09:00-17:00; Sa 10:00-14:00")), "Opening hours vary through the week; see below.");
   assert.equal(hoursSentence(parseOsmHours("Mo,We,Fr 10:00-16:00")), "Open Monday, Wednesday and Friday, 10:00 to 16:00.");
+  assert.equal(hoursSentence(parseOsmHours("Mo-Sa 07:00-23:00; Su 07:30-20:00")), "Open every day, 07:00 to 23:00, except Sunday, 07:30 to 20:00.");
+  const bil = withLocalName({ name: "Mokafé", lat: 50.8467, lng: 4.3525, address: "Galerie du Roi - Koningsgalerij, Bruxelles - Brussel", about: "Mokafé is an independent café on Galerie du Roi - Koningsgalerij, Bruxelles - Brussel." } as { name: string; lat: number; lng: number; address?: string; about?: string }, ["nl"]);
+  assert.equal(bil.address, "Koningsgalerij, Brussel");
+  assert.equal(bil.about, "Mokafé is an independent café on Koningsgalerij, Brussel.");
   // nothing in any line is a question or a made-up claim about a particular venue
   for (const label of ["Escape room", "Arcade", "Museum", "Park", "Independent café", "Castle", "Brewery"]) assert.ok(!blurbFor(label)!.includes("?"), label);
   assert.ok(matchesText(cafe, "waffles"), "the venue's own facts are searchable");

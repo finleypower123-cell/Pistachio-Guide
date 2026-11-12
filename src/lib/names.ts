@@ -19,8 +19,25 @@ export function localName(name: string, lat: number, lng: number, languages: rea
 export const deviceLanguages = (): readonly string[] => (typeof navigator === "undefined" ? [] : (navigator.languages ?? [navigator.language]));
 
 /** A place with its name shortened for display where that is safe; the full name is kept alongside. */
-export function withLocalName<T extends { name: string; lat: number; lng: number; fullName?: string }>(a: T, languages: readonly string[] = deviceLanguages()): T {
+export function withLocalName<T extends { name: string; lat: number; lng: number; fullName?: string; address?: string; about?: string }>(
+  a: T,
+  languages: readonly string[] = deviceLanguages(),
+): T {
   const full = a.fullName ?? a.name;
   const short = localName(full, a.lat, a.lng, languages);
-  return short === a.name ? a : { ...a, name: short, fullName: short === full ? undefined : full };
+  // Street and town names in Brussels are recorded the same way ("Grand-Place - Grote Markt").
+  const address = a.address
+    ?.split(",")
+    .map((part) => localName(part.trim(), a.lat, a.lng, languages))
+    .join(", ");
+  let about = a.about;
+  if (about && short !== full) about = about.split(full).join(short);
+  if (about && a.address && address !== a.address)
+    a.address.split(",").forEach((part, i) => {
+      const p = part.trim();
+      const s = address!.split(", ")[i];
+      if (p && s && p !== s) about = about!.split(p).join(s);
+    });
+  if (short === a.name && address === a.address && about === a.about) return a;
+  return { ...a, name: short, fullName: short === full ? undefined : full, address, about };
 }

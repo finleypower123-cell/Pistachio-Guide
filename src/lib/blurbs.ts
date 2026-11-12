@@ -108,7 +108,15 @@ export function hoursSentence(hours: WeeklyHours | null | undefined): string {
   const ranges = order.map((d) => hours[d] ?? null);
   const open = ranges.filter((r): r is [number, number] => r !== null);
   if (!open.length) return "";
-  if (!open.every((r) => r[0] === open[0][0] && r[1] === open[0][1])) return "Opening hours vary through the week; see below.";
+  const same = (x: [number, number], y: [number, number]) => x[0] === y[0] && x[1] === y[1];
+  if (!open.every((r) => same(r, open[0]))) {
+    // Open every day with one day different reads better spelled out than "see below".
+    const odd = ranges.findIndex((r, i) => r && ranges.filter((q) => q && same(q, r)).length === 1 && i >= 0);
+    const usual = ranges.find((r, i) => r && i !== odd);
+    if (open.length === 7 && odd >= 0 && usual && ranges.filter((r) => r && same(r, usual)).length === 6)
+      return `Open every day, ${formatRange(usual).replace("–", " to ")}, except ${DAY[order[odd]]}, ${formatRange(ranges[odd]!).replace("–", " to ")}.`;
+    return "Opening hours vary through the week; see below.";
+  }
   const span = formatRange(open[0]).replace("–", " to ");
   if (open.length === 7) return `Open every day, ${span}.`;
   const isOpen = ranges.map(Boolean);
