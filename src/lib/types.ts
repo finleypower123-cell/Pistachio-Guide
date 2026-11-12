@@ -36,12 +36,19 @@ export type Tag = "weird" | "gem" | "date" | "family" | "solo" | "friends" | "ra
  * Where a listing came from. This drives the badges users see:
  * - demo: sample content written for this prototype, positioned around the chosen location
  * - osm: a real place from OpenStreetMap; only fields OSM actually records are shown
+ * - overture: a real place from Overture Maps that OpenStreetMap hasn't recorded; same rule
  * - business: a listing a business owner has claimed and edited
  */
-export type Source = "demo" | "osm" | "business";
+export type Source = "demo" | "osm" | "overture" | "business";
+
+/** A real place from open map data, as opposed to a demo listing. */
+export const isOpenData = (a: { source: Source }) => a.source === "osm" || a.source === "overture";
 
 /** Opening hours by JS weekday (0 = Sunday). Each day is [openHour, closeHour] or null when closed. */
 export type WeeklyHours = ([number, number] | null)[];
+
+/** Every opening range by JS weekday (0 = Sunday), for places that close part of the day, e.g. for lunch. */
+export type DayRanges = [number, number][][];
 
 export type BookingType = "partner" | "walkin" | "free" | "venue" | "unknown";
 
@@ -88,6 +95,8 @@ export interface Activity {
   groupMax?: number;
   tags: Tag[];
   hours?: WeeklyHours | null;
+  /** Set only when some day has more than one opening range; `hours` then holds first opening to last closing. */
+  hoursDetail?: DayRanges;
   /** Raw OSM opening_hours string, shown verbatim when it can't be parsed */
   openingHoursRaw?: string;
   summary: string;
@@ -98,6 +107,8 @@ export interface Activity {
   booking: BookingType;
   website?: string;
   phone?: string;
+  /** Social pages, from Overture Maps */
+  links?: { instagram?: string; facebook?: string };
   sponsored?: boolean;
   deal?: string;
   events?: BusinessEvent[];

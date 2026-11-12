@@ -22,7 +22,7 @@ import { loadPlaceById } from "@/lib/discover";
 import { withLocalName } from "@/lib/names";
 import { loadPlaceMedia, visitorLangs, type PlaceMedia } from "@/lib/wiki";
 import { distanceKm, formatDistance, formatWalk } from "@/lib/geo";
-import { formatRange, openStatus, weekRows } from "@/lib/hours";
+import { formatRanges, openStatus, weekRows } from "@/lib/hours";
 import type { Activity, PhotoCredit, WikiRef } from "@/lib/types";
 import { cn, priceLabel } from "@/lib/utils";
 
@@ -89,7 +89,7 @@ export default function ActivityPage() {
   // OSM places outside the current search area, or with only basic details, are fetched by id
   const tried = useRef<string | null>(null);
   useEffect(() => {
-    if (!hydrated || PREVIEW || fetched || !id.startsWith("osm-") || tried.current === id) return;
+    if (!hydrated || PREVIEW || fetched || !/^(osm|ovt)-/.test(id) || tried.current === id) return;
     const known = findActivity(id);
     if (known && !known.partial) return;
     tried.current = id;
@@ -161,7 +161,7 @@ export default function ActivityPage() {
   }
 
   const km = distanceKm(place, a);
-  const status = openStatus(a.hours);
+  const status = openStatus(a.hours, a.hoursDetail);
   const isDemo = a.source === "demo";
   // A venue's own photos come first; otherwise Wikimedia photos of this place, each with its credit.
   const ownPhotos = Boolean(a.photos?.length) && !a.photoCredits?.length;
@@ -360,10 +360,10 @@ export default function ActivityPage() {
               {a.hours ? (
                 <table className="mt-3 w-full text-[15px] tabular">
                   <tbody>
-                    {weekRows(a.hours).map((r) => (
+                    {weekRows(a.hours, a.hoursDetail).map((r) => (
                       <tr key={r.day} className={cn("border-b border-line", r.d === today && "font-extrabold")}>
                         <td className="py-2">{r.day}</td>
-                        <td className="py-2 text-right">{formatRange(r.range)}</td>
+                        <td className="py-2 text-right">{formatRanges(r.ranges)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -399,12 +399,26 @@ export default function ActivityPage() {
               ) : (
                 <p className="mt-3 flex gap-2 text-ink-soft"><Accessibility className="mt-0.5 size-5 shrink-0" /> We don&apos;t know about step-free access here yet. Ask the venue if you need it.</p>
               )}
-              {(a.website || a.phone) && (
+              {(a.website || a.phone || a.links) && (
                 <ul className="mt-3 space-y-2 text-sm font-bold">
                   {a.website && (
                     <li>
                       <a href={a.website} target="_blank" rel="noopener noreferrer" onClick={() => logEvent(a.id, "website_click")} className="inline-flex items-center gap-2 underline underline-offset-2">
                         <Globe className="size-4" /> Website
+                      </a>
+                    </li>
+                  )}
+                  {a.links?.instagram && (
+                    <li>
+                      <a href={a.links.instagram} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 underline underline-offset-2">
+                        <ExternalLink className="size-4" /> Instagram
+                      </a>
+                    </li>
+                  )}
+                  {a.links?.facebook && (
+                    <li>
+                      <a href={a.links.facebook} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 underline underline-offset-2">
+                        <ExternalLink className="size-4" /> Facebook
                       </a>
                     </li>
                   )}
@@ -424,6 +438,12 @@ export default function ActivityPage() {
               <p className="mt-2 text-xs text-ink-soft">
                 Details come from OpenStreetMap and can be out of date. Something wrong? <a href={`https://www.openstreetmap.org/${a.osm.type}/${a.osm.id}`} target="_blank" rel="noopener noreferrer" className="underline">Improve it on OpenStreetMap</a> or{" "}
                 <Link href={`/business?claim=${a.id}`} className="underline">claim this listing</Link>.
+              </p>
+            )}
+            {a.source === "overture" && (
+              <p className="mt-2 text-xs text-ink-soft">
+                Details come from <a href="https://overturemaps.org" target="_blank" rel="noopener noreferrer" className="underline">Overture Maps</a> and can be out of date. Is this your place?{" "}
+                <Link href={`/business?claim=${a.id}`} className="underline">Claim this listing</Link>.
               </p>
             )}
           </section>

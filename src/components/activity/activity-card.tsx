@@ -21,7 +21,7 @@ import { SaveButton } from "./save-button";
 export function ActivityCard({ a, className, compact = false, row = false, priority = false }: { a: Activity; className?: string; compact?: boolean; row?: boolean; priority?: boolean }) {
   const { place } = useApp();
   const km = distanceKm(place, a);
-  const status = a.hours ? openStatus(a.hours) : null;
+  const status = a.hours ? openStatus(a.hours, a.hoursDetail) : null;
   return (
     // On phones a list is a plain list: rows divided by a line, a square picture, no card around each.
     <article

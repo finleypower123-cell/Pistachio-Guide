@@ -1,6 +1,7 @@
+import chainNames from "../data/chain-names.json";
 import { blurbFor, hoursSentence, introSentence, venueFacts } from "./blurbs";
 import { CAT } from "./categories";
-import { parseOsmHours } from "./hours";
+import { parseHoursLight, type ParsedHours } from "./hours";
 import type { Activity, CategoryId, Tag } from "./types";
 import { wikiRefFromTags } from "./wiki";
 
@@ -61,7 +62,35 @@ interface Mapped {
 const CHAIN_NAME =
   /^(starbucks|costa( coffee)?|pret( a manger)?|caff[eè] nero|mccaf[eé]|tim hortons|dunkin\b.*|greggs|exki|panos|paul|le pain quotidien|coffee fellows|espresso house|coffee island|segafredo.*|second cup|gloria jean'?s.*|black sheep coffee|coffee ?#?1|joe ?& ?the juice|bagels ?& ?beans|coffee company|tchibo|columbus caf[eé].*)$/i;
 
-const isBranded = (t: Record<string, string>) => Boolean(t.brand || t["brand:wikidata"] || CHAIN_NAME.test((t.name ?? "").trim()));
+/** Lowercase, no accents or punctuation; the same as scripts/build-chain-names.mjs. */
+export const plainName = (s: string) =>
+  s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/&/g, " and ").replace(/['’`]/g, "").replace(/[^a-z0-9]+/g, " ").trim();
+
+const CHAINS: Record<string, Set<string>> = Object.fromEntries(Object.entries(chainNames as Record<string, string[]>).map(([k, v]) => [k, new Set(v)]));
+
+/**
+ * Is this name a chain listed in the Name Suggestion Index for the place's own tag? "Starbucks" and
+ * "Starbucks Gare du Midi" both count; a café named after a cinema chain doesn't.
+ */
+export function isListedChain(t: Record<string, string>): boolean {
+  const name = plainName(t.name ?? "");
+  if (!name) return false;
+  for (const k of ["amenity", "leisure", "shop", "tourism", "craft"]) {
+    const set = t[k] && CHAINS[`${k}/${t[k]}`];
+    if (!set) continue;
+    if (set.has(name)) return true;
+    const words = name.split(" ");
+    // "Costa Coffee Victoria": try the first one to three words as the brand
+    for (let n = Math.min(3, words.length - 1); n >= 1; n--) {
+      const head = words.slice(0, n).join(" ");
+      if (head.length >= 5 && set.has(head)) return true;
+    }
+  }
+  return false;
+}
+
+const isBranded = (t: Record<string, string>) =>
+  Boolean(t.brand || t["brand:wikidata"] || CHAIN_NAME.test((t.name ?? "").trim()) || isListedChain(t));
 
 function classify(t: Record<string, string>): Mapped | null {
   const branded = isBranded(t);
@@ -164,6 +193,17 @@ function address(t: Record<string, string>) {
   return parts.length ? parts.join(", ") : undefined;
 }
 
+type HoursParser = (raw: string | undefined, lat: number, lng: number) => ParsedHours | null | undefined;
+let fullHoursParser: HoursParser | null = null;
+
+/**
+ * Server code and the city build register the full opening_hours parser (src/lib/hours-full.ts)
+ * here; it is too large to send to browsers, which keep the light one.
+ */
+export function setFullHoursParser(fn: HoursParser) {
+  fullHoursParser = fn;
+}
+
 export function elementToActivity(el: OsmElement): Activity | null {
   const t = el.tags ?? {};
   if (!t.name) return null;
@@ -200,11 +240,13 @@ export function elementToActivity(el: OsmElement): Activity | null {
   const kind = blurbFor(m.typeLabel);
   const facts = venueFacts(t);
   const summary = t.description ? t.description.slice(0, 180) : [kind ?? `${m.typeLabel}.`, facts].filter(Boolean).join(" ");
-  const parsedHours = parseOsmHours(t.opening_hours);
+  const full = fullHoursParser?.(t.opening_hours, lat, lng);
+  const parsed = full === undefined ? parseHoursLight(t.opening_hours) : full;
+  const parsedHours = parsed?.hours ?? null;
   const about = [
     introSentence(t.name!, m.typeLabel, t["addr:street"], t["addr:city"]),
     t.description,
-    hoursSentence(parsedHours),
+    hoursSentence(parsedHours, parsed?.detail),
     facts,
     kind,
   ]
@@ -230,6 +272,7 @@ export function elementToActivity(el: OsmElement): Activity | null {
     accessNote,
     tags,
     hours: parsedHours,
+    ...(parsed?.detail ? { hoursDetail: parsed.detail } : {}),
     openingHoursRaw: hoursRaw,
     summary,
     about,

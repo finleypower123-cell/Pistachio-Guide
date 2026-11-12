@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
-import { buildAroundQuery, elementsToPlaces, roundCoord, runOverpass } from "@/lib/osm";
+import { buildAroundQuery, elementsToPlaces, roundCoord, runOverpass, setFullHoursParser } from "@/lib/osm";
+import { fullHours } from "@/lib/hours-full";
+
+setFullHoursParser(fullHours);
 
 /**
  * Full OpenStreetMap records around a point, via Overpass. The public Overpass servers are often

@@ -1,3 +1,4 @@
+import { overturePlaceById } from "./overture";
 import { CITIES, CITY_DATA_RADIUS_KM, type City, type CityData } from "./cities";
 import { distanceKm } from "./geo";
 import { osmApiPlace, photonNearby } from "./places-fallback";
@@ -207,6 +208,15 @@ export async function loadNearbyPlaces(
 }
 
 export async function loadPlaceById(id: string, signal?: AbortSignal): Promise<Activity> {
+  if (id.startsWith("ovt-")) {
+    // Overture places live in the city file that added them.
+    const place = await overturePlaceById(id, async (path) => {
+      const res = await fetch(path, { signal });
+      return res.ok ? res.json() : null;
+    });
+    if (!place) throw Object.assign(new Error("Place not found."), { status: 404 });
+    return place;
+  }
   const m = id.match(/^osm-(node|way|relation)-(\d+)$/);
   if (!m) throw new Error("Unknown place id.");
   try {

@@ -6,6 +6,8 @@ const pill = "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs fo
 export function SourceBadge({ a, className }: { a: Activity; className?: string }) {
   if (a.source === "osm")
     return <span className={cn(pill, "bg-osm-bg text-osm-ink", className)} title="Real place from OpenStreetMap">OpenStreetMap</span>;
+  if (a.source === "overture")
+    return <span className={cn(pill, "bg-osm-bg text-osm-ink", className)} title="Real place from Overture Maps">Overture Maps</span>;
   if (a.source === "business")
     return <span className={cn(pill, "bg-accent text-forest", className)} title="Verified by the business">Verified</span>;
   return <span className={cn(pill, "bg-demo-bg text-demo-ink", className)} title="Sample listing, not a real venue">Demo</span>;
