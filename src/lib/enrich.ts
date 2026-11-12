@@ -187,8 +187,21 @@ async function blurFor(photo: string): Promise<string | undefined> {
   }
 }
 
-export async function withPhotoBlurs(places: Activity[]): Promise<{ places: Activity[]; blurred: number }> {
-  const blurs = await pool(places, 2, (a) => (a.photos?.[0] && !a.photoBlur ? blurFor(a.photos[0]) : Promise.resolve(a.photoBlur)));
+/**
+ * Adds blurred previews. Wikimedia limits how fast images can be fetched, so previews made in
+ * earlier weeks are reused (`known`, by photo address) and new ones are fetched one at a time
+ * until `budgetMs` runs out; the rest are picked up in the following weeks.
+ */
+export async function withPhotoBlurs(places: Activity[], known: Map<string, string> = new Map(), budgetMs = 45_000): Promise<{ places: Activity[]; blurred: number }> {
+  const stop = Date.now() + budgetMs;
+  const blurs = await pool(places, 1, async (a) => {
+    const photo = a.photos?.[0];
+    if (!photo) return undefined;
+    if (a.photoBlur) return a.photoBlur;
+    if (known.has(photo)) return known.get(photo);
+    if (Date.now() > stop) return undefined;
+    return blurFor(photo);
+  });
   let blurred = 0;
   const out = places.map((a, i) => {
     if (!blurs[i]) return a;

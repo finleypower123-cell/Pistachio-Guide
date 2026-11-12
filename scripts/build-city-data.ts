@@ -27,6 +27,16 @@ if (process.argv[2] === "--list") {
   process.exit(0);
 }
 
+/** Photo previews from last week's file, so they don't all have to be fetched again. */
+function previousBlurs(slug: string): Map<string, string> {
+  const known = new Map<string, string>();
+  try {
+    const old = JSON.parse(readFileSync(`${OUT}/${slug}.json`, "utf8")) as CityData;
+    for (const p of old.places) if (p.photos?.[0] && p.photoBlur) known.set(p.photos[0], p.photoBlur);
+  } catch {}
+  return known;
+}
+
 function overtureFor(slug: string): { release?: string; places: OverturePlace[] } | null {
   const file = `${OVERTURE_DIR}/${slug}.json`;
   if (!existsSync(file)) return null;
@@ -57,7 +67,7 @@ async function main() {
       const photos = await loadAreaPhotos(places, centre, CITY_DATA_RADIUS_KM).catch(() => ({}));
       // Real descriptions (Wikipedia, else the venue's website) and blurred previews of the photos.
       const described = await withDescriptions(withAreaPhotos(places, photos));
-      const blurred = await withPhotoBlurs(described.places);
+      const blurred = await withPhotoBlurs(described.places, previousBlurs(city.slug));
       const data: CityData = {
         builtAt: new Date().toISOString(),
         centre,
