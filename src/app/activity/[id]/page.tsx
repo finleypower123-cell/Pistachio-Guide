@@ -19,6 +19,7 @@ import { PREVIEW, SHOW_DEMO } from "@/lib/preview";
 import { CAT, TAG_LABEL } from "@/lib/categories";
 import { sampleReviews } from "@/lib/demo-data";
 import { loadPlaceById } from "@/lib/discover";
+import { withLocalName } from "@/lib/names";
 import { loadPlaceMedia, visitorLangs, type PlaceMedia } from "@/lib/wiki";
 import { distanceKm, formatDistance, formatWalk } from "@/lib/geo";
 import { formatRange, openStatus, weekRows } from "@/lib/hours";
@@ -75,14 +76,15 @@ export default function ActivityPage() {
 
   // A place known only by name, type and location is swapped for its full record once that loads.
   const listed = findActivity(id);
-  const a: Activity | undefined = useMemo(
-    () =>
+  const a: Activity | undefined = useMemo(() => {
+    const found =
       (listed?.partial && fetched ? { ...fetched, address: fetched.address ?? listed.address } : listed) ??
       fetched ??
       saved.find((s) => s.id === id)?.snapshot ??
-      recent.find((r) => r.id === id)?.snapshot,
-    [listed, fetched, saved, recent, id],
-  );
+      recent.find((r) => r.id === id)?.snapshot;
+    // Only once the page is live in the browser, so the server and the first render agree.
+    return found && hydrated ? withLocalName(found) : found;
+  }, [listed, fetched, saved, recent, id, hydrated]);
 
   // OSM places outside the current search area, or with only basic details, are fetched by id
   const tried = useRef<string | null>(null);

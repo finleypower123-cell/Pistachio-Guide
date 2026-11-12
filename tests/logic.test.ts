@@ -1,3 +1,4 @@
+import { localName, withLocalName } from "../src/lib/names";
 import { createHash } from "node:crypto";
 import { directThumb, md5 } from "../src/lib/wiki";
 import assert from "node:assert/strict";
@@ -200,6 +201,23 @@ assert.equal(photonToElement({ properties: { osm_id: 1, osm_type: "N", osm_key: 
   assert.equal(directThumb(commonsThumb("Tour Eiffel (été).jpg", 500))!.split("/thumb/")[1].split("/").slice(2).join("/"), "Tour_Eiffel_(%C3%A9t%C3%A9).jpg/500px-Tour_Eiffel_(%C3%A9t%C3%A9).jpg");
   assert.equal(directThumb(commonsThumb("x".repeat(170) + ".jpg", 330)), undefined, "very long names keep the redirecting address");
   assert.equal(directThumb("https://example.org/a.jpg"), undefined);
+}
+
+// ---- one language's half of a bilingual Brussels name ----
+{
+  const both = "Musée de la Ville de Bruxelles - Museum van de Stad Brussel";
+  assert.equal(localName(both, 50.8467, 4.3525, ["en-GB"]), "Musée de la Ville de Bruxelles");
+  assert.equal(localName(both, 50.8467, 4.3525, ["nl-BE", "en"]), "Museum van de Stad Brussel");
+  assert.equal(localName(both, 50.8467, 4.3525, []), "Musée de la Ville de Bruxelles", "no language known");
+  assert.equal(localName("Rock - Pop Bar", 51.5145, -0.0875, ["en"]), "Rock - Pop Bar", "names outside Brussels are never touched");
+  assert.equal(localName("A - B - C", 50.8467, 4.3525, ["en"]), "A - B - C", "only a plain two-part name is split");
+  assert.equal(localName("Le 9 - 5", 50.8467, 4.3525, ["en"]), "Le 9 - 5", "a very short half is not a translation");
+  const place = withLocalName<{ name: string; lat: number; lng: number; fullName?: string }>({ name: both, lat: 50.8467, lng: 4.3525 }, ["fr"]);
+  assert.equal(place.name, "Musée de la Ville de Bruxelles");
+  assert.equal(place.fullName, both);
+  assert.equal(withLocalName(place, ["nl"]).name, "Museum van de Stad Brussel", "applying it again works from the full name");
+  const a = { ...elementToActivity({ type: "node", id: 91, lat: 50.8467, lon: 4.3525, tags: { tourism: "museum", name: both } })! };
+  assert.ok(matchesText(withLocalName(a, ["fr"]), "museum van de stad"), "the other half still finds it in search");
 }
 
 // ---- friendly descriptions ----

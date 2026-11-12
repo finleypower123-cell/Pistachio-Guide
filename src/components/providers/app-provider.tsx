@@ -6,6 +6,7 @@ import { demoActivities } from "@/lib/demo-data";
 import { loadNearbyPlaces } from "@/lib/discover";
 import { DEFAULT_PLACE } from "@/lib/geo";
 import { defaultFilters, loadRangeKm, type Filters } from "@/lib/search";
+import { withLocalName } from "@/lib/names";
 import { cachedAreaPhotos, loadAreaPhotos, withAreaPhotos, type AreaPhotos } from "@/lib/wiki";
 import { PREVIEW, SHOW_DEMO } from "@/lib/preview";
 import { local } from "@/lib/storage";
@@ -149,7 +150,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return withAreaPhotos(
       [...(SHOW_DEMO ? demoActivities(place) : []), ...osm].map((a) => applyOverlay(a, byId.get(a.id))),
       areaPhotos,
-    );
+    ).map((a) => withLocalName(a));
   }, [place, osm, overlays, areaPhotos]);
 
   const findActivity = useCallback((id: string) => activities.find((a) => a.id === id), [activities]);
