@@ -38,6 +38,16 @@ function Fact({ icon: Icon, label, value }: { icon: typeof Clock; label: string;
   );
 }
 
+/** Walking directions in the main map apps. Coordinates are used so the pin lands exactly on the place. */
+function directionLinks(a: Activity, from: { lat: number; lng: number }) {
+  const to = `${a.lat},${a.lng}`;
+  return {
+    apple: `https://maps.apple.com/?daddr=${to}&q=${encodeURIComponent(a.name)}&dirflg=w`,
+    google: `https://www.google.com/maps/dir/?api=1&destination=${to}&travelmode=walking`,
+    osm: `https://www.openstreetmap.org/directions?engine=fossgis_osrm_foot&route=${from.lat}%2C${from.lng}%3B${a.lat}%2C${a.lng}`,
+  };
+}
+
 function BookingDialog({ a, open, onClose }: { a: Activity; open: boolean; onClose: () => void }) {
   const link = bookingLink(a, "detail");
   return (
@@ -71,6 +81,7 @@ export default function ActivityPage() {
   const [fetched, setFetched] = useState<Activity | null>(null);
   const [fetchState, setFetchState] = useState<"idle" | "loading" | "error">("idle");
   const [booking, setBooking] = useState(false);
+  const [directions, setDirections] = useState(false);
   const [photo, setPhoto] = useState(0);
   const logged = useRef<string | null>(null);
 
@@ -208,9 +219,7 @@ export default function ActivityPage() {
     }
   };
 
-  const directionsUrl = !isDemo
-    ? `https://www.openstreetmap.org/directions?engine=fossgis_osrm_foot&route=${place.lat}%2C${place.lng}%3B${a.lat}%2C${a.lng}`
-    : null;
+  const directionsUrl = !isDemo ? directionLinks(a, place) : null;
 
   return (
     <div className="gutter mx-auto max-w-7xl pb-10 pt-4 md:pt-8">
@@ -276,9 +285,9 @@ export default function ActivityPage() {
               <Share2 className="size-4" /> Share
             </button>
             {directionsUrl ? (
-              <a href={directionsUrl} target="_blank" rel="noopener noreferrer" onClick={() => logEvent(a.id, "directions")} className="inline-flex items-center gap-2 rounded-full border border-line bg-surface px-4 py-2.5 text-sm font-bold">
+              <button type="button" onClick={() => setDirections(true)} className="inline-flex items-center gap-2 rounded-full border border-line bg-surface px-4 py-2.5 text-sm font-bold">
                 <Navigation className="size-4" /> Directions
-              </a>
+              </button>
             ) : (
               <a href="#location" className="inline-flex items-center gap-2 rounded-full border border-line bg-surface px-4 py-2.5 text-sm font-bold">
                 <Navigation className="size-4" /> See on map
@@ -302,23 +311,41 @@ export default function ActivityPage() {
 
           <section className="mt-10">
             <h2 className="text-2xl font-extrabold">About</h2>
-            {!a.about && media?.text ? (
-              <>
-                <p className="mt-3 max-w-[65ch] text-[17px]" lang={media.text.lang}>{media.text.text}</p>
-                <p className="mt-2 text-xs text-ink-soft">
-                  From{" "}
-                  <a href={media.text.url} target="_blank" rel="noopener noreferrer" className="underline">
-                    Wikipedia: {media.text.title}
-                  </a>
-                  , text under{" "}
-                  <a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noopener noreferrer" className="underline">
-                    CC BY-SA 4.0
-                  </a>
-                </p>
-              </>
-            ) : (
-              <p className="mt-3 max-w-[65ch] text-[17px]">{a.about ?? a.summary}</p>
-            )}
+            {(() => {
+              // A real description first (from the city build, else loaded now from Wikipedia), then what we know.
+              const d = a.description ?? (media?.text ? { text: media.text.text, lang: media.text.lang, source: "wikipedia" as const, url: media.text.url, title: media.text.title } : undefined);
+              return (
+                <>
+                  {d && (
+                    <>
+                      <p className="mt-3 max-w-[65ch] text-[17px]" lang={d.lang}>{d.text}</p>
+                      <p className="mt-2 text-xs text-ink-soft">
+                        {d.source === "wikipedia" ? (
+                          <>
+                            From{" "}
+                            <a href={d.url} target="_blank" rel="noopener noreferrer" className="underline">
+                              Wikipedia{d.title ? `: ${d.title}` : ""}
+                            </a>
+                            , text under{" "}
+                            <a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noopener noreferrer" className="underline">
+                              CC BY-SA 4.0
+                            </a>
+                          </>
+                        ) : (
+                          <>
+                            In their own words, from{" "}
+                            <a href={d.url} target="_blank" rel="noopener noreferrer" className="underline">
+                              their website
+                            </a>
+                          </>
+                        )}
+                      </p>
+                    </>
+                  )}
+                  <p className={cn("max-w-[65ch] text-[17px]", d ? "mt-4 text-ink-soft" : "mt-3")}>{a.about ?? a.summary}</p>
+                </>
+              );
+            })()}
             {a.special && (
               <div className="mt-5 rounded-[22px] bg-accent/40 p-5">
                 <h3 className="font-sans text-sm font-extrabold text-accent-ink">What makes it special</h3>
@@ -523,9 +550,9 @@ export default function ActivityPage() {
                 <p className="rounded-xl bg-surface-2 p-3 text-sm">Book directly with the venue. {isDemo && "(Demo listing: no real contact details.)"}</p>
               ) : null}
               {directionsUrl && (
-                <a href={directionsUrl} target="_blank" rel="noopener noreferrer" onClick={() => logEvent(a.id, "directions")} className="rounded-full border border-line py-3 text-center font-extrabold">
-                  Walking directions
-                </a>
+                <button type="button" onClick={() => setDirections(true)} className="rounded-full border border-line py-3 text-center font-extrabold">
+                  Get directions
+                </button>
               )}
             </div>
             {(status.open !== null || a.durationMin) && (
@@ -546,6 +573,32 @@ export default function ActivityPage() {
         </section>
       )}
 
+      {directionsUrl && (
+        <Sheet open={directions} onClose={() => setDirections(false)} title={`Directions to ${a.name}`}>
+          <div className="grid gap-2">
+            {[
+              { label: "Apple Maps", url: directionsUrl.apple },
+              { label: "Google Maps", url: directionsUrl.google },
+              { label: "OpenStreetMap", url: directionsUrl.osm },
+            ].map((d) => (
+              <a
+                key={d.label}
+                href={d.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => {
+                  logEvent(a.id, "directions");
+                  setDirections(false);
+                }}
+                className="flex items-center justify-between rounded-2xl border border-line bg-surface px-4 py-3.5 font-extrabold"
+              >
+                Open in {d.label} <ExternalLink className="size-4" />
+              </a>
+            ))}
+          </div>
+          <p className="mt-3 text-xs text-ink-soft">Walking directions from where you are. You can switch to transit or driving in the app.</p>
+        </Sheet>
+      )}
       <BookingDialog a={a} open={booking} onClose={() => setBooking(false)} />
     </div>
   );

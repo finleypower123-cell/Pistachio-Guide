@@ -79,7 +79,7 @@ export const ActivityArt = memo(function ActivityArt({
   className,
   priority = false,
 }: {
-  activity: Pick<Activity, "id" | "category" | "photos" | "name">;
+  activity: Pick<Activity, "id" | "category" | "photos" | "name" | "photoBlur">;
   variant?: number;
   /** A large picture (the place page's main photo): allows the bigger image size. */
   hero?: boolean;
@@ -104,6 +104,11 @@ export const ActivityArt = memo(function ActivityArt({
   return (
     <span className={cn("relative block h-full w-full overflow-hidden", className)}>
       {art}
+      {/* A tiny blurred copy of the photo, inlined in the data, so a picture shows at once */}
+      {variant === 0 && activity.photoBlur && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={activity.photoBlur} alt="" aria-hidden className="absolute inset-0 h-full w-full scale-110 object-cover blur-xl" />
+      )}
       <Photo src={photo} alt={`Photo of ${activity.name}`} hero={hero} sizes={sizes} priority={priority} />
     </span>
   );

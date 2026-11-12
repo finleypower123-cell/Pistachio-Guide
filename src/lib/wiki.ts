@@ -66,7 +66,7 @@ const fileSlug = (file: string) => encodeURIComponent(file.replace(/ /g, "_"));
  * A scaled copy of a Commons file. Wikimedia only serves a fixed set of thumbnail widths (other
  * sizes are refused), so callers choose from these three and never load the full-size original.
  */
-export type ThumbWidth = 330 | 500 | 960;
+export type ThumbWidth = 120 | 330 | 500 | 960;
 export const commonsThumb = (file: string, width: ThumbWidth) =>
   `https://commons.wikimedia.org/wiki/Special:FilePath/${fileSlug(file)}?width=${width}`;
 

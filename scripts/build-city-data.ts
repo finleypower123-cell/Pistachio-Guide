@@ -13,6 +13,7 @@ import { loadAreaPhotos, withAreaPhotos } from "../src/lib/wiki";
 import { fullHours } from "../src/lib/hours-full";
 import { setFullHoursParser } from "../src/lib/osm";
 import { mergeOverture, type OverturePlace } from "../src/lib/overture";
+import { withDescriptions, withPhotoBlurs } from "../src/lib/enrich";
 
 setFullHoursParser(fullHours);
 
@@ -54,18 +55,21 @@ async function main() {
       const merged = ovt ? mergeOverture(osmPlaces, ovt.places, city.slug) : null;
       const places = merged?.places ?? osmPlaces;
       const photos = await loadAreaPhotos(places, centre, CITY_DATA_RADIUS_KM).catch(() => ({}));
+      // Real descriptions (Wikipedia, else the venue's website) and blurred previews of the photos.
+      const described = await withDescriptions(withAreaPhotos(places, photos));
+      const blurred = await withPhotoBlurs(described.places);
       const data: CityData = {
         builtAt: new Date().toISOString(),
         centre,
         radiusKm: CITY_DATA_RADIUS_KM,
-        places: withAreaPhotos(places, photos),
+        places: blurred.places,
         photos,
         ...(ovt?.release ? { overtureRelease: ovt.release } : {}),
       };
       writeFileSync(`${OUT}/${city.slug}.json`, JSON.stringify(data));
       const fromOverture = merged ? `, Overture: ${merged.added} added, ${merged.enriched} given links` : ", no Overture file";
       console.log(
-        `${city.slug}: ${places.length} places (${full} full OSM records, ${places.filter((p) => p.hours).length} with hours, ${places.filter((p) => p.hoursDetail).length} with breaks)${fromOverture}, ${Object.keys(photos).length} photos, ${Math.round((Date.now() - started) / 1000)}s`,
+        `${city.slug}: ${places.length} places (${full} full OSM records, ${places.filter((p) => p.hours).length} with hours, ${places.filter((p) => p.hoursDetail).length} with breaks)${fromOverture}, ${Object.keys(photos).length} photos (${blurred.blurred} with previews), descriptions: ${described.wikipedia} Wikipedia + ${described.website} websites, ${Math.round((Date.now() - started) / 1000)}s`,
       );
     } catch (e) {
       failed++;

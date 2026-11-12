@@ -5,6 +5,7 @@ import { directThumb, md5 } from "../src/lib/wiki";
 import assert from "node:assert/strict";
 import { parseOsmHours, isOpenAt, openStatus, parseHoursLight, formatRanges, weekRows } from "../src/lib/hours";
 import { fullHours, ordinaryWeek } from "../src/lib/hours-full";
+import { firstSentences, metaDescription, usableSiteText, withDescriptions } from "../src/lib/enrich";
 import { cleanName, mergeOverture, overturePlaceById, overtureToActivity, sameName, streetOnly, type OverturePlace } from "../src/lib/overture";
 import { elementToActivity, buildAroundQuery, elementsToPlaces, isListedChain } from "../src/lib/osm";
 import { loadNearbyPlaces, loadPlaceById, timing } from "../src/lib/discover";
@@ -679,6 +680,48 @@ async function wikiTests() {
   assert.equal(osm.website, undefined, "the input isn't changed");
 }
 
+async function descriptionTests() {
+  assert.equal(firstSentences("One. Two is here. Three is longer than allowed by far.", 20), "One. Two is here.");
+  const html = `<html lang="fr"><head><meta charset="utf-8"><meta content="Un café de quartier avec du bon café, des pâtisseries maison et une terrasse au soleil." name="description"></head>`;
+  assert.deepEqual(metaDescription(html), { text: "Un café de quartier avec du bon café, des pâtisseries maison et une terrasse au soleil.", lang: "fr" });
+  assert.equal(metaDescription(`<meta property="og:description" content="Tom &amp; Jerry&#39;s bar">`)?.text, "Tom & Jerry's bar");
+  assert.equal(usableSiteText("Just another WordPress site with a longer tail of words here", "X"), false);
+  assert.equal(usableSiteText("cafe, coffee, brussels, cake, tea, lunch, brunch, wifi, terrace, cheap, best", "X"), false);
+  assert.equal(usableSiteText("A small neighbourhood café with good coffee and homemade cakes.", "X"), true);
+
+  // Wikipedia first, the venue's website otherwise; a text shared by two venues is a template and dropped
+  const realFetch = globalThis.fetch;
+  const page = (desc: string) => new Response(`<html lang="en"><head><meta name="description" content="${desc}"></head></html>`, { headers: { "content-type": "text/html" } });
+  globalThis.fetch = (async (input: RequestInfo | URL) => {
+    const url = String(input);
+    if (url.includes("wikidata.org")) return new Response(JSON.stringify({ entities: { Q1: { sitelinks: { enwiki: { title: "Magritte Museum" } } } } }));
+    if (url.includes("/page/summary/")) return new Response(JSON.stringify({ type: "standard", title: "Magritte Museum", extract: "The Magritte Museum is a museum in Brussels dedicated to the Belgian surrealist René Magritte.", content_urls: { desktop: { page: "https://en.wikipedia.org/wiki/Magritte_Museum" } } }));
+    if (url.includes("wikipedia.org") || url.includes("commons")) return new Response(JSON.stringify({ query: { pages: [] } }));
+    if (url.includes("kafe.be")) return page("A small neighbourhood café with good coffee and homemade cakes by the canal.");
+    if (url.includes("template")) return page("We build beautiful websites for restaurants and shops across Belgium today.");
+    return new Response("", { status: 404 });
+  }) as typeof fetch;
+  try {
+    const base = elementToActivity({ type: "node", id: 5, lat: 50.84, lon: 4.35, tags: { amenity: "cafe", name: "Kafe" } })!;
+    const museum = { ...elementToActivity({ type: "node", id: 6, lat: 50.84, lon: 4.35, tags: { tourism: "museum", name: "Magritte Museum", wikidata: "Q1" } })! };
+    const r = await withDescriptions([
+      { ...base, website: "https://kafe.be" },
+      museum,
+      { ...base, id: "a", name: "A", website: "https://template-a.be" },
+      { ...base, id: "b", name: "B", website: "https://template-b.be" },
+    ]);
+    assert.equal(r.places[0].description?.source, "website");
+    assert.equal(r.places[0].summary, "A small neighbourhood café with good coffee and homemade cakes by the canal.");
+    assert.equal(r.places[1].description?.source, "wikipedia");
+    assert.equal(r.places[1].description?.url, "https://en.wikipedia.org/wiki/Magritte_Museum");
+    assert.equal(r.places[2].description, undefined);
+    assert.equal(r.places[3].description, undefined);
+    assert.deepEqual([r.wikipedia, r.website], [1, 1]);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+}
+
 async function overtureLookupTests() {
   const place = { id: "ovt-brussels-22222222-2222-2222-2222-222222222222", name: "Kaffabar" };
   const asked: string[] = [];
@@ -691,6 +734,7 @@ async function overtureLookupTests() {
 fallbackTests()
   .then(wikiTests)
   .then(overtureLookupTests)
+  .then(descriptionTests)
   .then(
     () => console.log("all logic tests passed"),
     (e) => {
